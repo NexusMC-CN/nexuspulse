@@ -1,51 +1,16 @@
 {
-  "name": "nexuspulse",
-  "version": "0.1.0",
-  "description": "TypeScript browser notification runtime for Push, Notifications, Service Workers, WebSocket and Badging",
-  "type": "module",
-  "main": "./dist/index.cjs",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "import": {
-        "types": "./dist/index.d.ts",
-        "default": "./dist/index.js"
-      },
-      "require": {
-        "types": "./dist/index.d.cts",
-        "default": "./dist/index.cjs"
-      }
-    },
-    "./service-worker": {
-      "import": {
-        "types": "./dist/service-worker.d.ts",
-        "default": "./dist/service-worker.js"
-      },
-      "require": {
-        "types": "./dist/service-worker.d.cts",
-        "default": "./dist/service-worker.cjs"
-      }
-    }
-  },
-  "files": [
-    "dist",
-    "README.md"
+  "name": "nexuspulse-workspace",
+  "private": true,
+  "workspaces": [
+    "packages/browser",
+    "packages/server"
   ],
   "scripts": {
-    "build": "tsup",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "format:check": "prettier --check package.json scripts tests src tsconfig.json tsup.config.ts vitest.config.ts README.md",
-    "package:smoke": "node scripts/package-smoke.mjs",
-    "check": "npm run typecheck && npm test && npm run format:check",
-    "prepack": "npm run build"
-  },
-  "devDependencies": {
-    "prettier": "^3.6.2",
-    "@types/node": "^24.7.2",
-    "tsup": "^8.5.0",
-    "typescript": "^5.9.2",
-    "vitest": "^3.2.4"
+    "build": "npm run build --workspaces",
+    "typecheck": "npm run typecheck --workspaces",
+    "test": "npm test --workspaces",
+    "format:check": "npm run format:check --workspaces",
+    "format:root": "prettier --check package.json README.md",
+    "check": "npm run typecheck --workspaces && npm test --workspaces && npm run format:check --workspaces && npm run format:root"
   }
 }

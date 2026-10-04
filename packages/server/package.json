@@ -1,0 +1,40 @@
+{
+  "name": "nexuspulse-server",
+  "version": "0.1.0",
+  "description": "Framework-agnostic Node.js notification service and Fastify adapter for NexusPulse",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "format:check": "prettier --check package.json tests src tsconfig.json tsup.config.ts vitest.config.ts README.md",
+    "check": "npm run typecheck && npm test && npm run format:check",
+    "prepack": "npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^24.7.2",
+    "prettier": "^3.6.2",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}
