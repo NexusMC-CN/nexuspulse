@@ -23,6 +23,26 @@ describe("nexuspulse project contract", () => {
     expect(packageJson.exports?.["./service-worker"]).toBeDefined();
   });
 
+  it("routes ESM and CommonJS consumers to matching declaration formats", async () => {
+    const packageJson = JSON.parse(
+      await readFile(new URL("../package.json", import.meta.url), "utf8"),
+    );
+    expect(packageJson.exports["."]).toEqual({
+      import: { types: "./dist/index.d.ts", default: "./dist/index.js" },
+      require: { types: "./dist/index.d.cts", default: "./dist/index.cjs" },
+    });
+    expect(packageJson.exports["./service-worker"]).toEqual({
+      import: {
+        types: "./dist/service-worker.d.ts",
+        default: "./dist/service-worker.js",
+      },
+      require: {
+        types: "./dist/service-worker.d.cts",
+        default: "./dist/service-worker.cjs",
+      },
+    });
+  });
+
   it.skipIf(
     !existsSync(fileURLToPath(new URL("../dist/index.js", import.meta.url))),
   )("loads the built ESM entries", async () => {

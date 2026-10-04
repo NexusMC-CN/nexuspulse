@@ -76,8 +76,8 @@ export async function subscribePush(
 
   try {
     return await pushManager.subscribe({
-      userVisibleOnly: true,
       ...options.subscribeOptions,
+      userVisibleOnly: options.subscribeOptions?.userVisibleOnly ?? true,
       applicationServerKey: options.applicationServerKey,
     });
   } catch (error) {

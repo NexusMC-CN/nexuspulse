@@ -121,6 +121,27 @@ describe("service worker and push adapter", () => {
     });
   });
 
+  it("keeps the default when userVisibleOnly is undefined", async () => {
+    const configured = registration();
+    const subscribe = vi
+      .spyOn(configured.pushManager, "subscribe")
+      .mockResolvedValue({} as PushSubscription);
+
+    await subscribePush(
+      {
+        serviceWorker: { registration: configured },
+        applicationServerKey: "key",
+        subscribeOptions: { userVisibleOnly: undefined },
+      },
+      { Notification: { permission: "granted" } },
+    );
+
+    expect(subscribe).toHaveBeenCalledWith({
+      userVisibleOnly: true,
+      applicationServerKey: "key",
+    });
+  });
+
   it("maps an unavailable Push API to UnsupportedFeatureError", async () => {
     const configured = {
       pushManager: undefined,
