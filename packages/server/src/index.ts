@@ -1,10 +1,13 @@
-export { NotificationService } from "./service.js";
-export { createNexusPulseFastifyPlugin } from "./fastify.js";
+export {
+  NotificationService,
+  normalizePushSubscriptionInput,
+} from "./service.js";
 export {
   InvalidSubscriptionError,
   InvalidSubscriptionInputError,
   InvalidNotificationPayloadError,
   InvalidNotificationChannelError,
+  PushDeliveryTimeoutError,
   MissingUserError,
   NexusPulseServerError,
   isInvalidSubscriptionError,

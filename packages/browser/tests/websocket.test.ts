@@ -79,7 +79,7 @@ describe("WebSocketManager", () => {
     sockets[0].onopen?.();
     sockets[0].onmessage?.({ data: "late" });
     sockets[0].onclose?.();
-    await connecting;
+    await expect(connecting).rejects.toBeInstanceOf(ConnectionError);
 
     expect(manager.state).toBe("stopped");
     expect(onMessage).not.toHaveBeenCalled();
@@ -200,7 +200,7 @@ describe("WebSocketManager", () => {
     expect(onError).toHaveBeenCalledWith(expect.any(ConnectionError));
   });
 
-  it("settles a pending connect when an unopened socket exhausts reconnects", async () => {
+  it("rejects a pending connect when an unopened socket exhausts reconnects", async () => {
     const { Constructor, sockets } = fakeWebSocketConstructor();
     const onError = vi.fn();
     const manager = new WebSocketManager(
@@ -214,7 +214,7 @@ describe("WebSocketManager", () => {
 
     const first = manager.connect();
     sockets[0].onclose?.();
-    await expect(first).resolves.toBeUndefined();
+    await expect(first).rejects.toBeInstanceOf(ConnectionError);
     expect(manager.state).toBe("stopped");
     expect(onError).toHaveBeenCalledWith(expect.any(ConnectionError));
 
@@ -242,7 +242,7 @@ describe("WebSocketManager", () => {
     const lateOpen = sockets[0].onopen;
     const lateMessage = sockets[0].onmessage;
     sockets[0].onclose?.();
-    await connecting;
+    await expect(connecting).rejects.toBeInstanceOf(ConnectionError);
     lateOpen?.();
     lateMessage?.({ data: "late" });
 
@@ -251,7 +251,7 @@ describe("WebSocketManager", () => {
     expect(onStateChange).not.toHaveBeenCalledWith("connected");
   });
 
-  it("settles and stops when a socket closes without reconnect", async () => {
+  it("rejects and stops when a socket closes without reconnect", async () => {
     const { Constructor, sockets } = fakeWebSocketConstructor();
     const manager = new WebSocketManager(
       { url: "ws://example.test" },
@@ -262,7 +262,7 @@ describe("WebSocketManager", () => {
     const connecting = manager.connect();
     sockets[0].onclose?.();
 
-    await expect(connecting).resolves.toBeUndefined();
+    await expect(connecting).rejects.toBeInstanceOf(ConnectionError);
     expect(manager.state).toBe("stopped");
   });
 
@@ -276,7 +276,7 @@ describe("WebSocketManager", () => {
 
     const connecting = manager.connect();
     sockets[0].onerror?.();
-    await connecting;
+    await expect(connecting).rejects.toBeInstanceOf(ConnectionError);
     sockets[0].onclose?.();
     await vi.advanceTimersByTimeAsync(5);
 
@@ -311,7 +311,7 @@ describe("WebSocketManager", () => {
       { onError: missingError },
       {},
     );
-    await expect(missing.connect()).resolves.toBeUndefined();
+    await expect(missing.connect()).rejects.toBeInstanceOf(ConnectionError);
     expect(missingError).toHaveBeenCalledWith(expect.any(ConnectionError));
 
     const { Constructor, sockets } = fakeWebSocketConstructor();
@@ -328,13 +328,15 @@ describe("WebSocketManager", () => {
     );
     const connecting = manager.connect();
     sockets[0].onerror?.();
-    sockets[0].onopen?.();
-    await connecting;
-    sockets[0].onmessage?.({ data: "bad" });
+    await expect(connecting).rejects.toBeInstanceOf(ConnectionError);
+    const recovered = manager.connect();
+    sockets[1].onopen?.();
+    await recovered;
+    sockets[1].onmessage?.({ data: "bad" });
     expect(onError).toHaveBeenCalledWith(expect.any(ConnectionError));
   });
 
-  it("completes a connect promise on socket error and can reconnect", async () => {
+  it("rejects a connect promise on socket error and can reconnect", async () => {
     const { Constructor, sockets } = fakeWebSocketConstructor();
     const onError = vi.fn();
     const manager = new WebSocketManager(
@@ -345,7 +347,7 @@ describe("WebSocketManager", () => {
 
     const first = manager.connect();
     sockets[0].onerror?.();
-    await expect(first).resolves.toBeUndefined();
+    await expect(first).rejects.toBeInstanceOf(ConnectionError);
     const second = manager.connect();
     expect(Constructor).toHaveBeenCalledTimes(2);
     sockets[1].onopen?.();

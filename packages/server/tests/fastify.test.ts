@@ -1,12 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
+import Fastify from "fastify";
 import {
   NotificationService,
-  createNexusPulseFastifyPlugin,
   type FastifyInstanceLike,
   type FastifyReplyLike,
   type PushSubscriptionRecord,
   type SubscriptionStore,
 } from "../src/index.js";
+import {
+  createNexusPulseFastifyPlugin,
+  nexusPulseFastify,
+} from "../src/fastify.js";
 
 type RegisteredHandler = (...args: unknown[]) => unknown;
 
@@ -45,8 +49,55 @@ function reply() {
 }
 
 describe("createNexusPulseFastifyPlugin", () => {
+  it("registers through the optional Fastify peer adapter", async () => {
+    const records: PushSubscriptionRecord[] = [];
+    const service = new NotificationService({
+      store: {
+        async upsert(userId, subscription) {
+          const record = { ...subscription, id: "sub-1", userId };
+          records.push(record);
+          return record;
+        },
+        async removeForUser(userId, id) {
+          const index = records.findIndex(
+            (record) => record.userId === userId && record.id === id,
+          );
+          if (index < 0) return false;
+          records.splice(index, 1);
+          return true;
+        },
+        async listByUser(userId) {
+          return records.filter((record) => record.userId === userId);
+        },
+      },
+      subscriptionValidation: {
+        allowedEndpointOrigins: ["https://push.example"],
+      },
+    });
+    const app = Fastify();
+    await app.register(nexusPulseFastify, {
+      service,
+      resolveUserId: () => "user-1",
+    });
+    const response = await app.inject({
+      method: "POST",
+      url: "/nexuspulse/subscriptions",
+      payload: {
+        endpoint: "https://push.example/subscription",
+        keys: { p256dh: "p256dh", auth: "auth" },
+      },
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(201);
+    expect(response.json()).toMatchObject({ id: "sub-1", userId: "user-1" });
+  });
+
   it("registers authenticated subscription routes", async () => {
     const records: PushSubscriptionRecord[] = [];
+    const listByUser = vi.fn(async (userId: string) =>
+      records.filter((record) => record.userId === userId),
+    );
     const store: SubscriptionStore = {
       async upsert(userId, subscription) {
         const record = { ...subscription, id: "sub-1", userId };
@@ -61,11 +112,14 @@ describe("createNexusPulseFastifyPlugin", () => {
         records.splice(index, 1);
         return true;
       },
-      async listByUser(userId) {
-        return records.filter((record) => record.userId === userId);
-      },
+      listByUser,
     };
-    const service = new NotificationService({ store });
+    const service = new NotificationService({
+      store,
+      subscriptionValidation: {
+        allowedEndpointOrigins: ["https://push.example"],
+      },
+    });
     const { fastify, routes } = createFastify();
     await createNexusPulseFastifyPlugin({
       service,
@@ -101,6 +155,7 @@ describe("createNexusPulseFastifyPlugin", () => {
       deleteReply.result,
     );
     expect(deleteReply.response.status).toBe(204);
+    expect(listByUser).not.toHaveBeenCalled();
   });
 
   it("returns 401 when the user resolver cannot authenticate a request", async () => {

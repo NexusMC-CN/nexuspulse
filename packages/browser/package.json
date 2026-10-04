@@ -26,6 +26,16 @@
         "types": "./dist/service-worker.d.cts",
         "default": "./dist/service-worker.cjs"
       }
+    },
+    "./protocol": {
+      "import": {
+        "types": "./dist/protocol.d.ts",
+        "default": "./dist/protocol.js"
+      },
+      "require": {
+        "types": "./dist/protocol.d.cts",
+        "default": "./dist/protocol.cjs"
+      }
     }
   },
   "files": [

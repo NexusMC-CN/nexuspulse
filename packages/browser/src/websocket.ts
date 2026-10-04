@@ -64,6 +64,7 @@ export class WebSocketManager {
   private stopped = false;
   private pending: Promise<void> | undefined;
   private resolvePending: (() => void) | undefined;
+  private rejectPending: ((error: ConnectionError) => void) | undefined;
   private generation = 0;
 
   constructor(
@@ -83,21 +84,34 @@ export class WebSocketManager {
     this.handlers.onStateChange?.(state);
   }
 
-  private reportError(error: unknown): void {
-    const connectionError =
-      error instanceof ConnectionError
-        ? error
-        : new ConnectionError(
-            error instanceof Error
-              ? error.message
-              : "WebSocket connection failed",
-          );
-    this.handlers.onError?.(connectionError);
+  private toConnectionError(error: unknown): ConnectionError {
+    return error instanceof ConnectionError
+      ? error
+      : new ConnectionError(
+          error instanceof Error
+            ? error.message
+            : "WebSocket connection failed",
+        );
   }
 
-  private settlePending(): void {
+  private reportError(error: unknown): ConnectionError {
+    const connectionError = this.toConnectionError(error);
+    this.handlers.onError?.(connectionError);
+    return connectionError;
+  }
+
+  private settlePendingSuccess(): void {
     this.resolvePending?.();
     this.resolvePending = undefined;
+    this.rejectPending = undefined;
+    this.pending = undefined;
+  }
+
+  private settlePendingFailure(error: unknown): void {
+    const connectionError = this.toConnectionError(error);
+    this.rejectPending?.(connectionError);
+    this.resolvePending = undefined;
+    this.rejectPending = undefined;
     this.pending = undefined;
   }
 
@@ -125,17 +139,20 @@ export class WebSocketManager {
       this.stopped = true;
       this.detachCurrent(false);
       this.setState("stopped");
-      this.settlePending();
+      this.settlePendingFailure(
+        new ConnectionError("WebSocket connection stopped before opening"),
+      );
       return;
     }
     if (this.reconnectAttempts >= config.maxAttempts) {
       this.stopped = true;
       this.detachCurrent(false);
       this.setState("stopped");
-      this.reportError(
-        new ConnectionError("WebSocket reconnect attempts exhausted"),
+      const connectionError = new ConnectionError(
+        "WebSocket reconnect attempts exhausted",
       );
-      this.settlePending();
+      this.reportError(connectionError);
+      this.settlePendingFailure(connectionError);
       return;
     }
     const delay = Math.min(
@@ -157,10 +174,10 @@ export class WebSocketManager {
     const constructor = asRecord(root)?.WebSocket;
     if (typeof constructor !== "function") {
       this.setState("stopped");
-      this.reportError(
+      const connectionError = this.reportError(
         new ConnectionError("The WebSocket API is not supported"),
       );
-      this.settlePending();
+      this.settlePendingFailure(connectionError);
       return;
     }
 
@@ -171,9 +188,9 @@ export class WebSocketManager {
         this.options.protocols,
       );
     } catch (error) {
-      this.reportError(error);
+      const connectionError = this.reportError(error);
       this.setState("stopped");
-      this.settlePending();
+      this.settlePendingFailure(connectionError);
       return;
     }
     this.current = socket;
@@ -181,7 +198,7 @@ export class WebSocketManager {
       if (this.stopped || this.generation !== token || this.current !== socket)
         return;
       this.setState("connected");
-      this.settlePending();
+      this.settlePendingSuccess();
     };
     socket.onmessage = (event) => {
       if (this.stopped || this.generation !== token || this.current !== socket)
@@ -197,13 +214,23 @@ export class WebSocketManager {
     socket.onerror = () => {
       if (this.stopped || this.generation !== token || this.current !== socket)
         return;
-      this.reportError(new ConnectionError());
-      this.settlePending();
+      const connectionError = this.reportError(new ConnectionError());
+      this.settlePendingFailure(connectionError);
+      this.detachCurrent(false);
+      this.scheduleReconnect();
     };
     socket.onclose = () => {
       if (this.stopped || this.generation !== token || this.current !== socket)
         return;
+      const wasConnecting = this.currentState === "connecting";
       this.detachCurrent(false);
+      if (wasConnecting) {
+        const connectionError = new ConnectionError(
+          "WebSocket closed before connection opened",
+        );
+        this.reportError(connectionError);
+        this.settlePendingFailure(connectionError);
+      }
       this.scheduleReconnect();
     };
   }
@@ -219,8 +246,9 @@ export class WebSocketManager {
     }
     this.stopped = false;
     this.reconnectAttempts = 1;
-    const pending = new Promise<void>((resolve) => {
+    const pending = new Promise<void>((resolve, reject) => {
       this.resolvePending = resolve;
+      this.rejectPending = reject;
     });
     this.pending = pending;
     void this.open();
@@ -235,6 +263,8 @@ export class WebSocketManager {
     }
     this.detachCurrent(true);
     this.setState("stopped");
-    this.settlePending();
+    this.settlePendingFailure(
+      new ConnectionError("WebSocket disconnected before connection opened"),
+    );
   }
 }

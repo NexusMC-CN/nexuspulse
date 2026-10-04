@@ -56,6 +56,8 @@ installNexusPulseServiceWorker();
 
 将产物部署到与页面同源的 `/nexuspulse-sw.js`，然后把相同路径传给 `serviceWorker.url`。Push 数据应为 JSON 格式的 `NotificationPayload`，例如：
 
+`NotificationPayload` 和 `NotificationAction` 也可以从 `nexuspulse/protocol` 导入；服务端包复用这组协议类型，避免两端维护不同定义。
+
 ```json
 {
   "title": "构建完成",
@@ -123,7 +125,7 @@ pulse.on("message", (payload) => {
 pulse.disconnect();
 ```
 
-默认不自动重连。配置 `reconnect` 后使用指数退避，达到 `maxAttempts` 会发出 `error` 事件并停止连接。
+默认不自动重连。配置 `reconnect` 后使用指数退避，达到 `maxAttempts` 会发出 `error` 事件并停止连接。`connect()` 只会在连接成功后 resolve；初始连接失败、连接在打开前关闭或主动断开时会 reject `ConnectionError`。
 
 ## Badging API
 

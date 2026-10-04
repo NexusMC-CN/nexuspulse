@@ -3,6 +3,11 @@
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "Bundler",
+    "baseUrl": ".",
+    "paths": {
+      "nexuspulse": ["../browser/src/index.ts"],
+      "nexuspulse/*": ["../browser/src/*"]
+    },
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,

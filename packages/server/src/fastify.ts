@@ -1,5 +1,5 @@
 import { InvalidSubscriptionInputError, MissingUserError } from "./errors.js";
-import { NotificationService } from "./service.js";
+import fp from "fastify-plugin";
 import type {
   FastifyInstanceLike,
   FastifyPluginOptions,
@@ -43,7 +43,7 @@ export function createNexusPulseFastifyPlugin(options: FastifyPluginOptions) {
   const prefix = options.prefix ?? "/nexuspulse";
   const resolveUserId = options.resolveUserId;
 
-  return async function registerNexusPulseFastify(
+  const registerNexusPulseFastify = async function registerNexusPulseFastify(
     fastify: FastifyInstanceLike,
   ): Promise<void> {
     fastify.decorate?.("nexusPulse", options.service);
@@ -78,17 +78,18 @@ export function createNexusPulseFastifyPlugin(options: FastifyPluginOptions) {
         const id = parameterId(request);
         if (!id)
           return reply.code(400).send({ error: "InvalidSubscriptionId" });
-        const subscriptions = await options.service.listSubscriptions(userId);
-        const owned = subscriptions.some(
-          (subscription) => subscription.id === id,
-        );
-        if (!owned)
+        const removed = await options.service.unsubscribe(userId, id);
+        if (!removed)
           return reply.code(404).send({ error: "SubscriptionNotFound" });
-        await options.service.unsubscribe(userId, id);
         return reply.code(204).send();
       },
     );
-    if (options.websocket && fastify.get) {
+    if (options.websocket) {
+      if (!fastify.get) {
+        throw new Error(
+          "WebSocket support requires a Fastify WebSocket integration",
+        );
+      }
       fastify.get(
         routePath(prefix, options.websocket.path ?? "/websocket"),
         { websocket: true },
@@ -117,8 +118,26 @@ export function createNexusPulseFastifyPlugin(options: FastifyPluginOptions) {
       );
     }
   };
+
+  return registerNexusPulseFastify;
 }
+
+/**
+ * Fastify is intentionally loaded only from this optional adapter entrypoint.
+ * The host remains responsible for authentication, CSRF protection, rate
+ * limiting, request body limits, and the application's error envelope.
+ */
+export const nexusPulseFastify = fp(
+  async (fastify, options: FastifyPluginOptions) => {
+    await createNexusPulseFastifyPlugin(options)(
+      fastify as unknown as FastifyInstanceLike,
+    );
+  },
+  { name: "nexuspulse-server" },
+);
 
 export type NexusPulseFastifyPlugin = ReturnType<
   typeof createNexusPulseFastifyPlugin
 >;
+
+export default nexusPulseFastify;

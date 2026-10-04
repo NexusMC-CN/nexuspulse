@@ -35,6 +35,11 @@ export class InvalidNotificationChannelError extends NexusPulseServerError {
   override readonly name = "InvalidNotificationChannelError";
 }
 
+export class PushDeliveryTimeoutError extends NexusPulseServerError {
+  override readonly name = "PushDeliveryTimeoutError";
+  readonly code = "PUSH_DELIVERY_TIMEOUT";
+}
+
 export function isInvalidSubscriptionError(error: unknown): boolean {
   if (error instanceof InvalidSubscriptionError) return true;
   if (!error || typeof error !== "object") return false;

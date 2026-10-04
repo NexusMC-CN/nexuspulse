@@ -3,7 +3,7 @@
 This repository contains the NexusPulse browser runtime and its Node.js server companion.
 
 - [`packages/browser`](./packages/browser): the published `nexuspulse` browser package.
-- [`packages/server`](./packages/server): the server-side notification core and Fastify adapter.
+- [`packages/server`](./packages/server): the server-side notification core and optional `nexuspulse-server/fastify` adapter.
 
 Install dependencies once from the workspace root:
 

@@ -15,6 +15,10 @@ const requiredFiles = [
   "dist/service-worker.cjs",
   "dist/service-worker.d.ts",
   "dist/service-worker.d.cts",
+  "dist/protocol.js",
+  "dist/protocol.cjs",
+  "dist/protocol.d.ts",
+  "dist/protocol.d.cts",
 ];
 
 for (const relativePath of requiredFiles) {
@@ -33,6 +37,8 @@ if (typeof serviceWorker.installNexusPulseServiceWorker !== "function") {
   throw new Error("The service-worker ESM entry does not expose its installer");
 }
 
+await import("nexuspulse/protocol");
+
 const require = createRequire(import.meta.url);
 const commonJsMain = require("nexuspulse");
 const commonJsWorker = require("nexuspulse/service-worker");
@@ -49,7 +55,10 @@ for (const extension of ["mts", "cts"]) {
   const source = [
     'import { createNexusPulse } from "nexuspulse";',
     'import { installNexusPulseServiceWorker } from "nexuspulse/service-worker";',
+    'import type { NotificationPayload } from "nexuspulse/protocol";',
     "createNexusPulse();",
+    'const payload: NotificationPayload = { title: "ready" };',
+    "void payload;",
     "void installNexusPulseServiceWorker;",
   ].join("\n");
   const options = {

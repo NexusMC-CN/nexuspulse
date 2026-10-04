@@ -1,23 +1,6 @@
-export interface NotificationAction {
-  action: string;
-  title: string;
-  icon?: string;
-}
+import type { NotificationPayload } from "./protocol.js";
 
-export interface NotificationPayload {
-  title: string;
-  id?: string;
-  body?: string;
-  icon?: string;
-  badge?: string;
-  tag?: string;
-  data?: Record<string, unknown>;
-  actions?: NotificationAction[];
-  timestamp?: number;
-  requireInteraction?: boolean;
-  silent?: boolean;
-  url?: string;
-}
+export type { NotificationAction, NotificationPayload } from "./protocol.js";
 
 export interface ServiceWorkerOptions {
   url?: string;

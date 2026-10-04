@@ -21,6 +21,7 @@ describe("nexuspulse project contract", () => {
     };
 
     expect(packageJson.exports?.["./service-worker"]).toBeDefined();
+    expect(packageJson.exports?.["./protocol"]).toBeDefined();
   });
 
   it("routes ESM and CommonJS consumers to matching declaration formats", async () => {
@@ -39,6 +40,16 @@ describe("nexuspulse project contract", () => {
       require: {
         types: "./dist/service-worker.d.cts",
         default: "./dist/service-worker.cjs",
+      },
+    });
+    expect(packageJson.exports["./protocol"]).toEqual({
+      import: {
+        types: "./dist/protocol.d.ts",
+        default: "./dist/protocol.js",
+      },
+      require: {
+        types: "./dist/protocol.d.cts",
+        default: "./dist/protocol.cjs",
       },
     });
   });
