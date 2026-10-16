@@ -1,5 +1,5 @@
 {
-  "name": "nexuspulse-server",
+  "name": "@nexusmc-cn/nexuspulse-server",
   "version": "0.1.0",
   "description": "Framework-agnostic Node.js notification service and Fastify adapter for NexusPulse",
   "type": "module",
@@ -44,7 +44,7 @@
     "@types/node": "^24.7.2",
     "fastify": "^5.12.5",
     "prettier": "^3.6.2",
-    "nexuspulse": "0.1.0",
+    "@nexusmc-cn/nexuspulse": "0.1.0",
     "tsup": "^8.5.0",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"
@@ -54,11 +54,15 @@
   },
   "peerDependencies": {
     "fastify": ">=5.0.0 <6.0.0",
-    "nexuspulse": "^0.1.0"
+    "@nexusmc-cn/nexuspulse": "^0.1.0"
   },
   "peerDependenciesMeta": {
     "fastify": {
       "optional": true
     }
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   }
 }

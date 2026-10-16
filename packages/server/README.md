@@ -1,19 +1,25 @@
-# nexuspulse-server
+# `@nexusmc-cn/nexuspulse-server` 服务端包
 
-`nexuspulse-server` provides the Node.js side of NexusPulse. The core is framework-agnostic; the Fastify integration is an optional `./fastify` entrypoint. Storage, caching, Push provider, queues, and WebSocket connection management remain application-owned dependencies.
+`@nexusmc-cn/nexuspulse-server` 提供 `NexusPulse` 的 Node.js 服务端能力。核心部分不绑定框架，Fastify 集成通过可选的 `./fastify` 入口提供。存储、缓存、Push 服务商、队列和 WebSocket 连接管理由应用负责。
 
-## Install
+[npm 包页面](https://www.npmjs.com/package/@nexusmc-cn/nexuspulse-server) · [配套浏览器与协议包](https://www.npmjs.com/package/@nexusmc-cn/nexuspulse)
+
+## 安装
 
 ```bash
-npm install nexuspulse-server
+npm install @nexusmc-cn/nexuspulse-server @nexusmc-cn/nexuspulse
 ```
 
-## Core service
+`@nexusmc-cn/nexuspulse` 是必需的 peer dependency，服务端通过 `@nexusmc-cn/nexuspulse/protocol` 复用通知协议类型。Fastify 是可选依赖，仅使用适配器时需要安装。
 
-Inject a subscription store and the transports used by your application:
+原无 scope 包 `nexuspulse-server` 的使用方需要同时替换服务端包和共享协议包的依赖名称，并更新模块导入。HTTP 路径和应用集成接口保持不变。
+
+## 核心服务
+
+注入应用使用的订阅存储和传输实现：
 
 ```ts
-import { NotificationService } from "nexuspulse-server";
+import { NotificationService } from "@nexusmc-cn/nexuspulse-server";
 
 const service = new NotificationService({
   store: subscriptionStore,
@@ -21,7 +27,9 @@ const service = new NotificationService({
     allowedEndpointOrigins: ["https://push.example"],
   },
   push: {
-    async send(subscription, payload) {
+    async send(subscription, payload, signal) {
+      // 将 signal 传给实际使用的 HTTP 客户端；此处仅示意 Push SDK 调用。
+      void signal;
       await webPush.sendNotification(subscription, JSON.stringify(payload));
     },
     isInvalidError(error) {
@@ -40,34 +48,34 @@ const service = new NotificationService({
 await service.send(
   userId,
   {
-    title: "Build complete",
-    body: "Your build is ready.",
+    title: "构建完成",
+    body: "你的构建已经可以使用。",
     url: "/builds/latest",
   },
   ["push", "websocket"],
 );
 ```
 
-`SubscriptionStore` defines `upsert`, `listByUser`, and `removeForUser`. `removeForUser` must be an atomic user-scoped delete; the service calls it directly so a stale list cannot turn a delete into a time-of-check/time-of-use race. This package does not create a database table, cache, queue, or in-memory store. The application can choose Prisma, Redis, a remote subscription service, or another implementation and control its consistency and retention policy.
+`SubscriptionStore` 定义 `upsert`、`listByUser` 和 `removeForUser`。`removeForUser` 必须是按用户范围执行的原子删除；服务会直接调用它，避免过期列表造成检查与使用之间的竞态。此包不会创建数据库表、缓存、队列或内存存储。应用可以选择 Prisma、Redis、远程订阅服务或其他实现，并自行控制一致性和保留策略。
 
-Incoming subscriptions are copied into a strict allowlist (`endpoint`, `expirationTime`, and `keys`). Endpoints must be HTTPS, cannot contain credentials or fragments, and private/local addresses are rejected. The service requires `subscriptionValidation.allowedEndpointOrigins` or the asynchronous `validateEndpoint` callback before it accepts an endpoint. Use the callback when the host has a provider allowlist or DNS/IP egress policy; it is the boundary that prevents DNS rebinding and other network-level SSRF cases.
+收到的订阅会被复制为严格白名单字段（`endpoint`、`expirationTime` 和 `keys`）。Endpoint 必须使用 HTTPS，不能包含凭据或片段，私有地址和本地地址会被拒绝。服务要求在接受 Endpoint 前配置 `subscriptionValidation.allowedEndpointOrigins` 或异步 `validateEndpoint` 回调。当宿主有服务商白名单或 DNS/IP 出站策略时，应使用该回调；它是阻止 DNS rebinding 和其他网络层 SSRF 风险的边界。
 
-Push fanout is bounded and each attempt has a timeout. The transport receives an `AbortSignal` and should pass it to its HTTP client so timed-out requests can be cancelled. Configure `pushDispatch.concurrency`, `timeoutMs`, `retries`, and backoff values to match the Push provider. Invalid subscriptions are removed and are not retried by default; other failures are reported to the caller after the retry policy is exhausted.
+Push 扇出投递具有并发上限，每次尝试都有超时。传输实现会收到 `AbortSignal`，应将它传给 HTTP 客户端，以便取消超时请求。根据 Push 服务商配置 `pushDispatch.concurrency`、`timeoutMs`、`retries` 和退避参数。无效订阅会被删除，默认不会重试；其他失败会在重试策略耗尽后返回给调用方。
 
-When a Push transport reports an invalid subscription, the service removes it with `removeForUser` and includes the cleanup in the delivery report. Other transport failures are returned in the report so the caller can decide whether to retry or log them.
+当 Push 传输报告订阅无效时，服务会通过 `removeForUser` 删除该订阅，并在投递报告中记录清理结果。其他传输失败也会返回在报告中，由调用方决定是否重试或记录日志。
 
-## Fastify adapter
+## Fastify 适配器
 
-Install Fastify when using the adapter:
+使用适配器时安装 Fastify 5：
 
 ```bash
-npm install nexuspulse-server fastify
+npm install @nexusmc-cn/nexuspulse-server @nexusmc-cn/nexuspulse fastify@5
 ```
 
-Import the optional entrypoint so the framework dependency is loaded only by applications that use it:
+从可选入口导入适配器，只有使用它的应用才会加载框架依赖：
 
 ```ts
-import { nexusPulseFastify } from "nexuspulse-server/fastify";
+import { nexusPulseFastify } from "@nexusmc-cn/nexuspulse-server/fastify";
 
 await fastify.register(nexusPulseFastify, {
   service,
@@ -76,11 +84,11 @@ await fastify.register(nexusPulseFastify, {
 });
 ```
 
-Routes are `POST /subscriptions` and `DELETE /subscriptions/:id`. The resolver is required so the existing application's authentication and tenant rules remain authoritative. Deletion is an atomic user-scoped operation.
+路由为 `POST /subscriptions` 和 `DELETE /subscriptions/:id`。必须提供用户解析器，以便现有应用的认证和租户规则继续作为权威来源。删除操作按用户范围原子执行。
 
-The adapter deliberately does not implement CSRF protection, rate limiting, body-size limits, authentication, or an error envelope. Register the host application's hooks/plugins and Fastify `bodyLimit` before registering this adapter. The host should also apply its own tenant authorization to `resolveUserId` and its own logging/metrics policy.
+适配器不会实现 CSRF 防护、限流、请求体大小限制、认证或错误响应封装。注册此适配器前，请先注册宿主应用的 hook/plugin，并配置 Fastify 的 `bodyLimit`。宿主还应在 `resolveUserId` 中执行租户授权，并使用自己的日志和指标策略。
 
-WebSocket upgrades are optional and application-owned. Supply a GET hook when the host integration needs one. The adapter registers the route with the Fastify WebSocket option and passes the upgraded socket to the callback:
+WebSocket 升级是可选能力，由应用负责。当宿主集成需要 WebSocket 时，请提供 GET hook。适配器会使用 Fastify 的 WebSocket 选项注册路由，并把升级后的 socket 传给回调：
 
 ```ts
 await fastify.register(nexusPulseFastify, {
@@ -94,13 +102,8 @@ await fastify.register(nexusPulseFastify, {
 });
 ```
 
-No broadcast route is registered. Sending notifications is a server-side application operation through `service.send`, where authorization and business rules can be applied before dispatch.
+适配器不会注册广播路由。发送通知是服务端应用通过 `service.send` 执行的操作，应用可以在投递前应用授权和业务规则。
 
-## Validation
+## 模块格式
 
-```bash
-npm run typecheck
-npm test
-npm run build
-npm run format:check
-```
+核心入口和 `@nexusmc-cn/nexuspulse-server/fastify` 均提供 ESM、CommonJS、source map 和 TypeScript 类型声明。

@@ -27,21 +27,21 @@ for (const relativePath of requiredFiles) {
   }
 }
 
-const main = await import("nexuspulse");
+const main = await import("@nexusmc-cn/nexuspulse");
 if (typeof main.createNexusPulse !== "function" || !main.NexusPulse) {
   throw new Error("The main ESM entry does not expose the runtime API");
 }
 
-const serviceWorker = await import("nexuspulse/service-worker");
+const serviceWorker = await import("@nexusmc-cn/nexuspulse/service-worker");
 if (typeof serviceWorker.installNexusPulseServiceWorker !== "function") {
   throw new Error("The service-worker ESM entry does not expose its installer");
 }
 
-await import("nexuspulse/protocol");
+await import("@nexusmc-cn/nexuspulse/protocol");
 
 const require = createRequire(import.meta.url);
-const commonJsMain = require("nexuspulse");
-const commonJsWorker = require("nexuspulse/service-worker");
+const commonJsMain = require("@nexusmc-cn/nexuspulse");
+const commonJsWorker = require("@nexusmc-cn/nexuspulse/service-worker");
 if (
   typeof commonJsMain.createNexusPulse !== "function" ||
   typeof commonJsWorker.installNexusPulseServiceWorker !== "function"
@@ -53,9 +53,9 @@ if (
 for (const extension of ["mts", "cts"]) {
   const consumerPath = path.join(root, `package-consumer.${extension}`);
   const source = [
-    'import { createNexusPulse } from "nexuspulse";',
-    'import { installNexusPulseServiceWorker } from "nexuspulse/service-worker";',
-    'import type { NotificationPayload } from "nexuspulse/protocol";',
+    'import { createNexusPulse } from "@nexusmc-cn/nexuspulse";',
+    'import { installNexusPulseServiceWorker } from "@nexusmc-cn/nexuspulse/service-worker";',
+    'import type { NotificationPayload } from "@nexusmc-cn/nexuspulse/protocol";',
     "createNexusPulse();",
     'const payload: NotificationPayload = { title: "ready" };',
     "void payload;",

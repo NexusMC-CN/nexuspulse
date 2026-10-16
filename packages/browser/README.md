@@ -2,21 +2,26 @@
 
 NexusPulse 是一个浏览器端 TypeScript 通知运行时，将 Notifications API、Push API、Service Worker、WebSocket 和 Badging API 统一到一个生命周期中。
 
+[npm 包页面](https://www.npmjs.com/package/@nexusmc-cn/nexuspulse) · [配套服务端包](https://www.npmjs.com/package/@nexusmc-cn/nexuspulse-server)
+
 ## 安装
 
 ```bash
-npm install nexuspulse
+npm install @nexusmc-cn/nexuspulse
 ```
 
-包提供两个入口：
+原无 scope 包 `nexuspulse` 的使用方需要将依赖名称和模块导入改为 `@nexusmc-cn/nexuspulse`；Service Worker 文件名和通知点击消息类型保持不变。
 
-- `nexuspulse`：应用窗口中的 `NexusPulse` 运行时和各个适配器。
-- `nexuspulse/service-worker`：在 Service Worker 文件中安装 Push 和通知点击处理器。
+包提供三个入口：
+
+- `@nexusmc-cn/nexuspulse`：应用窗口中的 `NexusPulse` 运行时和各个适配器。
+- `@nexusmc-cn/nexuspulse/service-worker`：在 Service Worker 文件中安装 Push 和通知点击处理器。
+- `@nexusmc-cn/nexuspulse/protocol`：浏览器与服务端共享的 `NotificationPayload` 和 `NotificationAction` 协议类型。
 
 ## 最小接入
 
 ```ts
-import { createNexusPulse } from "nexuspulse";
+import { createNexusPulse } from "@nexusmc-cn/nexuspulse";
 
 const pulse = createNexusPulse({
   serviceWorker: { url: "/nexuspulse-sw.js" },
@@ -31,7 +36,7 @@ await pulse.initialize();
 await pulse.requestPermission();
 
 pulse.on("notification", (payload) => {
-  console.log("notification shown", payload.id);
+  console.log("通知已展示", payload.id);
 });
 
 await pulse.notify({
@@ -49,14 +54,14 @@ await pulse.notify({
 
 ```ts
 // src/nexuspulse-sw.ts
-import { installNexusPulseServiceWorker } from "nexuspulse/service-worker";
+import { installNexusPulseServiceWorker } from "@nexusmc-cn/nexuspulse/service-worker";
 
 installNexusPulseServiceWorker();
 ```
 
 将产物部署到与页面同源的 `/nexuspulse-sw.js`，然后把相同路径传给 `serviceWorker.url`。Push 数据应为 JSON 格式的 `NotificationPayload`，例如：
 
-`NotificationPayload` 和 `NotificationAction` 也可以从 `nexuspulse/protocol` 导入；服务端包复用这组协议类型，避免两端维护不同定义。
+`NotificationPayload` 和 `NotificationAction` 也可以从 `@nexusmc-cn/nexuspulse/protocol` 导入；服务端包复用这组协议类型，避免两端维护不同定义。
 
 ```json
 {
@@ -119,7 +124,7 @@ const pulse = createNexusPulse({
 
 await pulse.connect();
 pulse.on("message", (payload) => {
-  console.log(payload.title);
+  console.log("收到消息", payload.title);
 });
 
 pulse.disconnect();
@@ -144,14 +149,6 @@ await pulse.clearBadge();
 - 应用可以通过 `on("statechange", ...)`、`on("permissionchange", ...)`、`on("subscriptionchange", ...)` 和 `on("error", ...)` 观察运行时状态。
 - SSR 环境可以安全导入和创建实例，但浏览器相关方法应只在客户端调用。
 
-## 构建与验证
+## 模块格式
 
-```bash
-npm run typecheck
-npm test
-npm run build
-npm run package:smoke
-npm pack --dry-run
-```
-
-构建会生成 ESM、CommonJS、source map 和声明文件，并为 `nexuspulse` 与 `nexuspulse/service-worker` 两个入口分别生成产物。
+三个入口均提供 ESM、CommonJS、source map 和 TypeScript 类型声明，可由应用的构建工具按模块格式解析。

@@ -6,5 +6,5 @@ export default defineConfig({
   dts: true,
   sourcemap: true,
   clean: true,
-  external: ["fastify", "fastify-plugin", "nexuspulse"],
+  external: ["fastify", "fastify-plugin", "@nexusmc-cn/nexuspulse"],
 });

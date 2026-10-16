@@ -5,8 +5,8 @@
     "moduleResolution": "Bundler",
     "baseUrl": ".",
     "paths": {
-      "nexuspulse": ["../browser/src/index.ts"],
-      "nexuspulse/*": ["../browser/src/*"]
+      "@nexusmc-cn/nexuspulse": ["../browser/src/index.ts"],
+      "@nexusmc-cn/nexuspulse/*": ["../browser/src/*"]
     },
     "strict": true,
     "esModuleInterop": true,

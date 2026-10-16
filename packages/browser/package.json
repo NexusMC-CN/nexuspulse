@@ -1,6 +1,10 @@
 {
-  "name": "nexuspulse",
+  "name": "@nexusmc-cn/nexuspulse",
   "version": "0.1.0",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "description": "TypeScript browser notification runtime for Push, Notifications, Service Workers, WebSocket and Badging",
   "type": "module",
   "main": "./dist/index.cjs",

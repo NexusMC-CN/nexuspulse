@@ -1,9 +1,9 @@
-import type { NotificationPayload } from "nexuspulse/protocol";
+import type { NotificationPayload } from "@nexusmc-cn/nexuspulse/protocol";
 
 export type {
   NotificationAction,
   NotificationPayload,
-} from "nexuspulse/protocol";
+} from "@nexusmc-cn/nexuspulse/protocol";
 
 export interface PushSubscriptionInput {
   endpoint: string;
