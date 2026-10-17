@@ -5,6 +5,7 @@ export {
 export {
   InvalidSubscriptionError,
   InvalidSubscriptionInputError,
+  EndpointValidationError,
   InvalidNotificationPayloadError,
   InvalidNotificationChannelError,
   PushDeliveryTimeoutError,

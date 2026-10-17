@@ -24,13 +24,19 @@ export interface SubscriptionStore {
   ): Promise<PushSubscriptionRecord>;
   /** Removing an unknown id should be idempotent and return false. */
   removeForUser(userId: string, id: string): Promise<boolean>;
+  /** Storage metadata is permitted; only subscription protocol fields are delivered. */
   listByUser(userId: string): Promise<PushSubscriptionRecord[]>;
 }
 
 export interface SubscriptionValidationOptions {
   /** Exact endpoint origins accepted by the host. */
   allowedEndpointOrigins?: readonly string[];
-  /** Host-owned endpoint policy, including DNS/IP egress checks. */
+  /**
+   * Host-owned endpoint policy, including DNS/IP egress checks.
+   * Return false to permanently reject an endpoint. Throw or reject when the
+   * policy cannot run; EndpointValidationError preserves the cause and stored
+   * subscriptions remain available for a later send after policy recovery.
+   */
   validateEndpoint?: (endpoint: URL) => boolean | Promise<boolean>;
 }
 

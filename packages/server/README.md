@@ -58,7 +58,9 @@ await service.send(
 
 `SubscriptionStore` 定义 `upsert`、`listByUser` 和 `removeForUser`。`removeForUser` 必须是按用户范围执行的原子删除；服务会直接调用它，避免过期列表造成检查与使用之间的竞态。此包不会创建数据库表、缓存、队列或内存存储。应用可以选择 Prisma、Redis、远程订阅服务或其他实现，并自行控制一致性和保留策略。
 
-收到的订阅会被复制为严格白名单字段（`endpoint`、`expirationTime` 和 `keys`）。Endpoint 必须使用 HTTPS，不能包含凭据或片段，私有地址和本地地址会被拒绝。服务要求在接受 Endpoint 前配置 `subscriptionValidation.allowedEndpointOrigins` 或异步 `validateEndpoint` 回调。当宿主有服务商白名单或 DNS/IP 出站策略时，应使用该回调；它是阻止 DNS rebinding 和其他网络层 SSRF 风险的边界。
+客户端提交的订阅仅接受严格白名单字段（`endpoint`、`expirationTime` 和 `keys`），未知字段会被拒绝。存储适配器返回的记录可以带有 `createdAt`、`updatedAt` 等元数据；投递前会单独提取协议字段，Push 传输只收到 `id`、`userId` 和通过校验的订阅字段。Endpoint 必须使用 HTTPS，不能包含凭据或片段，私有地址和本地地址会被拒绝。服务要求在接受 Endpoint 前配置 `subscriptionValidation.allowedEndpointOrigins` 或异步 `validateEndpoint` 回调。当宿主有服务商白名单或 DNS/IP 出站策略时，应使用该回调；它是阻止 DNS rebinding 和其他网络层 SSRF 风险的边界。
+
+`validateEndpoint` 返回 `false` 表示确定拒绝该 Endpoint，订阅请求会报 `InvalidSubscriptionInputError`，投递时会清理对应记录。回调抛错或 Promise 拒绝表示策略执行失败（例如临时 DNS 故障），会统一包装为 `EndpointValidationError`，通过 `cause` 保留原始异常；即使回调主动抛出 `InvalidSubscriptionInputError`，也遵循此规则。此时不会调用 Push 传输或删除订阅，投递报告会记录 `failed` 和错误，宿主可在策略恢复后再次调用 `send`。订阅请求会向宿主传播该错误，默认 Fastify 响应为 500，便于稍后重试。
 
 Push 扇出投递具有并发上限，每次尝试都有超时。传输实现会收到 `AbortSignal`，应将它传给 HTTP 客户端，以便取消超时请求。根据 Push 服务商配置 `pushDispatch.concurrency`、`timeoutMs`、`retries` 和退避参数。无效订阅会被删除，默认不会重试；其他失败会在重试策略耗尽后返回给调用方。
 

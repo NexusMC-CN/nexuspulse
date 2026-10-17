@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import Fastify from "fastify";
 import {
+  InvalidSubscriptionInputError,
   NotificationService,
   type FastifyInstanceLike,
   type FastifyReplyLike,
@@ -49,6 +50,71 @@ function reply() {
 }
 
 describe("createNexusPulseFastifyPlugin", () => {
+  it("reports policy execution failures as server errors and accepts a later retry", async () => {
+    const records: PushSubscriptionRecord[] = [];
+    const cause = new InvalidSubscriptionInputError("DNS unavailable");
+    let unavailable = true;
+    const service = new NotificationService({
+      store: {
+        async upsert(userId, subscription) {
+          const record = { ...subscription, id: "sub-1", userId };
+          records.push(record);
+          return record;
+        },
+        async removeForUser() {
+          return false;
+        },
+        async listByUser() {
+          return records;
+        },
+      },
+      subscriptionValidation: {
+        validateEndpoint: async () => {
+          if (unavailable) throw cause;
+          return true;
+        },
+      },
+    });
+    const app = Fastify();
+    const errors: unknown[] = [];
+    app.addHook("onError", async (_request, _reply, error) => {
+      errors.push(error);
+    });
+    await app.register(nexusPulseFastify, {
+      service,
+      resolveUserId: () => "user-1",
+    });
+    const request = {
+      method: "POST" as const,
+      url: "/nexuspulse/subscriptions",
+      payload: { endpoint: "https://push.example/subscription" },
+    };
+
+    try {
+      const failed = await app.inject(request);
+      expect(failed.statusCode).toBe(500);
+      expect(records).toEqual([]);
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatchObject({
+        name: "EndpointValidationError",
+        cause,
+      });
+      expect((errors[0] as Error).cause).toBe(cause);
+
+      unavailable = false;
+      const recovered = await app.inject(request);
+      expect(recovered.statusCode).toBe(201);
+      expect(recovered.json()).toEqual({
+        id: "sub-1",
+        userId: "user-1",
+        endpoint: "https://push.example/subscription",
+      });
+      expect(records).toHaveLength(1);
+    } finally {
+      await app.close();
+    }
+  });
+
   it("registers through the optional Fastify peer adapter", async () => {
     const records: PushSubscriptionRecord[] = [];
     const service = new NotificationService({

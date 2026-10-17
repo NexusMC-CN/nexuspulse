@@ -27,6 +27,11 @@ export class InvalidSubscriptionInputError extends NexusPulseServerError {
   override readonly name = "InvalidSubscriptionInputError";
 }
 
+/** Host endpoint policy could not run; its original failure is available as cause. */
+export class EndpointValidationError extends NexusPulseServerError {
+  override readonly name = "EndpointValidationError";
+}
+
 export class InvalidNotificationPayloadError extends NexusPulseServerError {
   override readonly name = "InvalidNotificationPayloadError";
 }

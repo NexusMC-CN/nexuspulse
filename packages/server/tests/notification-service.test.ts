@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   InvalidSubscriptionError,
+  InvalidSubscriptionInputError,
   NotificationService,
+  normalizePushSubscriptionInput,
   type PushSubscriptionRecord,
   type PushSubscriptionInput,
   type SubscriptionStore,
@@ -341,5 +343,183 @@ describe("NotificationService", () => {
 
     expect(send).toHaveBeenCalledOnce();
     expect(result.push.removed).toBe(1);
+  });
+
+  it.each([
+    [
+      "DNS rejection",
+      Object.assign(new Error("DNS unavailable"), { code: "EAI_AGAIN" }),
+    ],
+    [
+      "input error thrown by policy",
+      new InvalidSubscriptionInputError("policy unavailable"),
+    ],
+  ])(
+    "retains subscriptions after %s and sends after policy recovery",
+    async (_label, cause) => {
+      const existing = { ...subscription, id: "sub-1", userId: "user-1" };
+      const { store, records } = createStore([existing]);
+      const delivered: PushSubscriptionRecord[] = [];
+      let unavailable = true;
+      const service = new NotificationService({
+        store,
+        push: {
+          send: async (record) => {
+            delivered.push(record);
+          },
+        },
+        subscriptionValidation: {
+          validateEndpoint: async () => {
+            if (unavailable) throw cause;
+            return true;
+          },
+        },
+      });
+
+      const failed = await service.send("user-1", { title: "Ready" }, ["push"]);
+
+      expect(failed.push).toMatchObject({ sent: 0, failed: 1, removed: 0 });
+      expect(failed.push.errors).toHaveLength(1);
+      expect(failed.push.errors[0]).toMatchObject({
+        name: "EndpointValidationError",
+        cause,
+      });
+      expect((failed.push.errors[0] as Error).cause).toBe(cause);
+      expect(failed.push.errors[0]).not.toBeInstanceOf(
+        InvalidSubscriptionInputError,
+      );
+      expect(records).toEqual([existing]);
+      expect(delivered).toEqual([]);
+
+      unavailable = false;
+      const recovered = await service.send("user-1", { title: "Ready" }, [
+        "push",
+      ]);
+
+      expect(recovered.push).toEqual({
+        sent: 1,
+        failed: 0,
+        removed: 0,
+        skipped: false,
+        errors: [],
+      });
+      expect(delivered).toEqual([existing]);
+      expect(records).toEqual([existing]);
+    },
+  );
+
+  it("sends persisted subscription fields without ORM metadata", async () => {
+    const existing = {
+      id: "sub-1",
+      userId: "user-1",
+      endpoint: "https://push.example/subscription",
+      expirationTime: null,
+      keys: { p256dh: "p256dh", auth: "auth" },
+      createdAt: new Date("2026-10-16T00:00:00Z"),
+      updatedAt: new Date("2026-10-17T00:00:00Z"),
+      internalTenantId: "tenant-1",
+    };
+    const { store, records } = createStore([existing]);
+    const delivered: PushSubscriptionRecord[] = [];
+    const service = new NotificationService({
+      store,
+      push: {
+        send: async (record) => {
+          delivered.push(record);
+        },
+      },
+      subscriptionValidation: {
+        allowedEndpointOrigins: ["https://push.example"],
+      },
+    });
+
+    const result = await service.send("user-1", { title: "Ready" }, ["push"]);
+
+    expect(result.push).toEqual({
+      sent: 1,
+      failed: 0,
+      removed: 0,
+      skipped: false,
+      errors: [],
+    });
+    expect(delivered).toEqual([
+      {
+        id: "sub-1",
+        userId: "user-1",
+        endpoint: "https://push.example/subscription",
+        expirationTime: null,
+        keys: { p256dh: "p256dh", auth: "auth" },
+      },
+    ]);
+    expect(records).toEqual([existing]);
+  });
+
+  it("cleans up only explicitly rejected or expired records in a mixed send", async () => {
+    const initial = ["healthy", "temporary", "denied", "gone"].map((id) => ({
+      ...subscription,
+      id,
+      userId: "user-1",
+      endpoint: `https://push.example/${id}`,
+    }));
+    const { store, records } = createStore(initial);
+    const delivered: string[] = [];
+    const cause = new Error("policy unavailable");
+    const service = new NotificationService({
+      store,
+      push: {
+        send: async (record) => {
+          delivered.push(record.id);
+          if (record.id === "gone") throw { statusCode: 410 };
+        },
+      },
+      subscriptionValidation: {
+        validateEndpoint: (endpoint) => {
+          if (endpoint.pathname === "/temporary") throw cause;
+          return endpoint.pathname !== "/denied";
+        },
+      },
+    });
+
+    const result = await service.send("user-1", { title: "Ready" }, ["push"]);
+
+    expect(result.push).toMatchObject({ sent: 1, failed: 3, removed: 2 });
+    expect(result.push.errors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "EndpointValidationError", cause }),
+        expect.any(InvalidSubscriptionInputError),
+        { statusCode: 410 },
+      ]),
+    );
+    expect(result.push.errors).toHaveLength(3);
+    expect(records.map((record) => record.id).sort()).toEqual([
+      "healthy",
+      "temporary",
+    ]);
+    expect(delivered.sort()).toEqual(["gone", "healthy"]);
+  });
+
+  it("rejects explicit endpoint policy denial when subscribing", async () => {
+    const { store, records } = createStore();
+    const service = new NotificationService({
+      store,
+      subscriptionValidation: { validateEndpoint: () => false },
+    });
+
+    await expect(
+      service.subscribe("user-1", subscription),
+    ).rejects.toBeInstanceOf(InvalidSubscriptionInputError);
+    expect(records).toEqual([]);
+  });
+
+  it("preserves synchronous endpoint policy failures through the public normalizer", async () => {
+    const cause = new Error("policy unavailable");
+
+    await expect(
+      normalizePushSubscriptionInput(subscription, {
+        validateEndpoint: () => {
+          throw cause;
+        },
+      }),
+    ).rejects.toMatchObject({ name: "EndpointValidationError", cause });
   });
 });
