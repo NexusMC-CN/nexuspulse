@@ -141,7 +141,7 @@ export interface FastifyInstanceLike {
 }
 
 export interface FastifyPluginOptions {
-  service: import("./service.js").NotificationService;
+  service: import("../notifications/service.js").NotificationService;
   prefix?: string;
   resolveUserId: (
     request: FastifyRequestLike,
@@ -153,7 +153,7 @@ export interface FastifyPluginOptions {
       socket: unknown,
       request: FastifyRequestLike,
       userId: string,
-      service: import("./service.js").NotificationService,
+      service: import("../notifications/service.js").NotificationService,
     ) => unknown | Promise<unknown>;
   };
 }

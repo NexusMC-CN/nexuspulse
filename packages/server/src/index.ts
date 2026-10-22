@@ -1,7 +1,7 @@
 export {
   NotificationService,
   normalizePushSubscriptionInput,
-} from "./service.js";
+} from "./notifications/service.js";
 export {
   InvalidSubscriptionError,
   InvalidSubscriptionInputError,
@@ -12,5 +12,5 @@ export {
   MissingUserError,
   NexusPulseServerError,
   isInvalidSubscriptionError,
-} from "./errors.js";
-export type * from "./types.js";
+} from "./core/errors.js";
+export type * from "./core/types.js";

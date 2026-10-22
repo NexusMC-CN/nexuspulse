@@ -1,12 +1,12 @@
 import {
   EndpointValidationError,
   InvalidSubscriptionInputError,
-} from "../errors.js";
+} from "../core/errors.js";
 import type {
   PushSubscriptionInput,
   PushSubscriptionRecord,
   SubscriptionValidationOptions,
-} from "../types.js";
+} from "../core/types.js";
 
 const MAX_ENDPOINT_LENGTH = 4_096;
 const MAX_KEY_LENGTH = 4_096;

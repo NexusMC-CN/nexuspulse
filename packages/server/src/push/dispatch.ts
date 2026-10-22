@@ -1,13 +1,13 @@
 import {
   PushDeliveryTimeoutError,
   isInvalidSubscriptionError,
-} from "../errors.js";
+} from "../core/errors.js";
 import type {
   NotificationPayload,
   PushDispatchOptions,
   PushSubscriptionRecord,
   PushTransport,
-} from "../types.js";
+} from "../core/types.js";
 
 const DEFAULT_PUSH_DISPATCH: Required<
   Omit<PushDispatchOptions, "shouldRetry">

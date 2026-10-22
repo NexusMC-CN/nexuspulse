@@ -2,12 +2,12 @@ import {
   InvalidNotificationChannelError,
   InvalidNotificationPayloadError,
   InvalidSubscriptionInputError,
-} from "./errors.js";
-import { PushDispatcher } from "./push/dispatch.js";
+} from "../core/errors.js";
+import { PushDispatcher } from "../push/dispatch.js";
 import {
   normalizePushSubscriptionInput,
   normalizeStoredPushSubscriptionRecord,
-} from "./subscriptions/validation.js";
+} from "../subscriptions/validation.js";
 import type {
   ChannelResult,
   NotificationChannel,
@@ -18,9 +18,9 @@ import type {
   PushSubscriptionRecord,
   SubscriptionValidationOptions,
   SubscriptionStore,
-} from "./types.js";
+} from "../core/types.js";
 
-export { normalizePushSubscriptionInput } from "./subscriptions/validation.js";
+export { normalizePushSubscriptionInput } from "../subscriptions/validation.js";
 
 function emptyChannelResult(skipped: boolean): ChannelResult {
   return { sent: 0, failed: 0, removed: 0, skipped, errors: [] };
