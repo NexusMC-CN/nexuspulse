@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ConnectionError, createNexusPulse } from "../src/index.js";
-import { WebSocketManager } from "../src/websocket.js";
+import { WebSocketManager } from "../src/websocket/manager.js";
 
 function socketRuntime(closeEvent?: "sync") {
   const sockets: Socket[] = [];

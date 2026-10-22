@@ -3,12 +3,12 @@ import { describe, expect, it, vi } from "vitest";
 import {
   requestNotificationPermission,
   showNotification,
-} from "../src/notifications.js";
-import { clearBadge, setBadge } from "../src/badge.js";
+} from "../src/notifications/notifications.js";
+import { clearBadge, setBadge } from "../src/badge/badge.js";
 import {
   PermissionDeniedError,
   UnsupportedFeatureError,
-} from "../src/errors.js";
+} from "../src/core/errors.js";
 
 describe("notification adapter", () => {
   it("returns granted when the injected Notification permission is granted", async () => {

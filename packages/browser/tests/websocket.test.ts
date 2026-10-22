@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 
-import { ConnectionError } from "../src/errors.js";
-import { WebSocketManager } from "../src/websocket.js";
+import { ConnectionError } from "../src/core/errors.js";
+import { WebSocketManager } from "../src/websocket/manager.js";
 
 type FakeSocket = {
   onopen: (() => void) | null;

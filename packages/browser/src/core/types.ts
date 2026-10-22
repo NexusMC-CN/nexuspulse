@@ -1,6 +1,6 @@
-import type { NotificationPayload } from "./protocol.js";
+import type { NotificationPayload } from "../protocol.js";
 
-export type { NotificationAction, NotificationPayload } from "./protocol.js";
+export type { NotificationAction, NotificationPayload } from "../protocol.js";
 
 export interface ServiceWorkerOptions {
   url?: string;

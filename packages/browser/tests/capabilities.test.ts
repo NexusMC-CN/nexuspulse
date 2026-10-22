@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { detectCapabilities } from "../src/capabilities.js";
+import { detectCapabilities } from "../src/core/capabilities.js";
 import {
   ConnectionError,
   InvalidConfigurationError,
   PermissionDeniedError,
   SubscriptionError,
   UnsupportedFeatureError,
-} from "../src/errors.js";
+} from "../src/core/errors.js";
 
 describe("detectCapabilities", () => {
   it("is safe to call with an SSR runtime that has no browser globals", () => {

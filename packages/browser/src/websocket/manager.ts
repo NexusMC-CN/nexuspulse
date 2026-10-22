@@ -1,5 +1,5 @@
-import type { NotificationPayload, WebSocketOptions } from "../types.js";
-import { ConnectionError } from "../errors.js";
+import type { NotificationPayload, WebSocketOptions } from "../core/types.js";
+import { ConnectionError } from "../core/errors.js";
 
 export type WebSocketState = "idle" | "connecting" | "connected" | "stopped";
 

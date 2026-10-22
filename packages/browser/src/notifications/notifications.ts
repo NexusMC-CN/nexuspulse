@@ -1,5 +1,8 @@
-import type { NotificationAction, NotificationPayload } from "./types.js";
-import { PermissionDeniedError, UnsupportedFeatureError } from "./errors.js";
+import type { NotificationAction, NotificationPayload } from "../core/types.js";
+import {
+  PermissionDeniedError,
+  UnsupportedFeatureError,
+} from "../core/errors.js";
 
 type RuntimeRecord = Record<string, unknown>;
 

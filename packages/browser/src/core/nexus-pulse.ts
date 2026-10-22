@@ -1,20 +1,20 @@
 import {
   setBadge as setBadgeAdapter,
   clearBadge as clearBadgeAdapter,
-} from "./badge.js";
+} from "../badge/badge.js";
 import { detectCapabilities } from "./capabilities.js";
 import { InvalidConfigurationError, type ConnectionError } from "./errors.js";
 import {
   requestNotificationPermission,
   showNotification,
-} from "./notifications.js";
-import { resolveNotificationUrl } from "./notification-url.js";
+} from "../notifications/notifications.js";
+import { resolveNotificationUrl } from "../notifications/notification-url.js";
 import {
   subscribePush as subscribePushAdapter,
   unsubscribePush as unsubscribePushAdapter,
-} from "./push.js";
-import { ensureServiceWorkerRegistration } from "./push.js";
-import { WebSocketManager } from "./websocket.js";
+} from "../push/push.js";
+import { ensureServiceWorkerRegistration } from "../push/push.js";
+import { WebSocketManager } from "../websocket/manager.js";
 import type {
   Capabilities,
   NexusPulseEventMap,

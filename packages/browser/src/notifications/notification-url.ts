@@ -1,4 +1,4 @@
-import { InvalidConfigurationError } from "./errors.js";
+import { InvalidConfigurationError } from "../core/errors.js";
 
 function originOf(value: string): string | undefined {
   try {

@@ -3,8 +3,8 @@ import {
   PermissionDeniedError,
   SubscriptionError,
   UnsupportedFeatureError,
-} from "./errors.js";
-import type { PushOptions, ServiceWorkerOptions } from "./types.js";
+} from "../core/errors.js";
+import type { PushOptions, ServiceWorkerOptions } from "../core/types.js";
 
 export interface PushAdapterOptions extends PushOptions {
   serviceWorker?: ServiceWorkerOptions;

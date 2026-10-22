@@ -1,15 +1,15 @@
-export { NexusPulse, createNexusPulse } from "./nexus-pulse.js";
-export { detectCapabilities } from "./capabilities.js";
+export { NexusPulse, createNexusPulse } from "./core/nexus-pulse.js";
+export { detectCapabilities } from "./core/capabilities.js";
 export {
   requestNotificationPermission,
   showNotification,
-} from "./notifications.js";
+} from "./notifications/notifications.js";
 export {
   subscribePush,
   unsubscribePush,
   ensureServiceWorkerRegistration,
-} from "./push.js";
-export { setBadge, clearBadge } from "./badge.js";
-export { WebSocketManager } from "./websocket.js";
-export * from "./errors.js";
-export type * from "./types.js";
+} from "./push/push.js";
+export { setBadge, clearBadge } from "./badge/badge.js";
+export { WebSocketManager } from "./websocket/manager.js";
+export * from "./core/errors.js";
+export type * from "./core/types.js";

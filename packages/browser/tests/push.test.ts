@@ -4,13 +4,13 @@ import {
   ensureServiceWorkerRegistration,
   subscribePush,
   unsubscribePush,
-} from "../src/push.js";
+} from "../src/push/push.js";
 import {
   InvalidConfigurationError,
   PermissionDeniedError,
   SubscriptionError,
   UnsupportedFeatureError,
-} from "../src/errors.js";
+} from "../src/core/errors.js";
 
 function registration(overrides: Record<string, unknown> = {}) {
   return {
