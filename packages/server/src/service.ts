@@ -111,18 +111,34 @@ export class NotificationService {
       },
     };
 
+    const deliveries: Promise<void>[] = [];
     if (requestedChannels.includes("push") && this.push) {
-      result.push = await this.sendPush(userId, payload);
+      deliveries.push(
+        (async () => {
+          try {
+            result.push = await this.sendPush(userId, payload);
+          } catch (error) {
+            result.push.failed = 1;
+            result.push.errors.push(error);
+          }
+        })(),
+      );
     }
-    if (requestedChannels.includes("websocket") && this.realtime) {
-      try {
-        await this.realtime.publish(userId, payload);
-        result.websocket.sent = true;
-      } catch (error) {
-        result.websocket.failed = true;
-        result.websocket.error = error;
-      }
+    const realtime = this.realtime;
+    if (requestedChannels.includes("websocket") && realtime) {
+      deliveries.push(
+        (async () => {
+          try {
+            await realtime.publish(userId, payload);
+            result.websocket.sent = true;
+          } catch (error) {
+            result.websocket.failed = true;
+            result.websocket.error = error;
+          }
+        })(),
+      );
     }
+    await Promise.all(deliveries);
     return result;
   }
 

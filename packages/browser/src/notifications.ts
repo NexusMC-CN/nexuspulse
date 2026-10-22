@@ -65,7 +65,16 @@ export function showNotification(
   if (payload.icon !== undefined) options.icon = payload.icon;
   if (payload.badge !== undefined) options.badge = payload.badge;
   if (payload.tag !== undefined) options.tag = payload.tag;
-  if (payload.data !== undefined) options.data = payload.data;
+  if (payload.data !== undefined || payload.url !== undefined) {
+    const data =
+      payload.data &&
+      typeof payload.data === "object" &&
+      !Array.isArray(payload.data)
+        ? { ...payload.data }
+        : {};
+    if (payload.url !== undefined) data.url = payload.url;
+    options.data = Object.keys(data).length > 0 ? data : payload.data;
+  }
   if (payload.actions !== undefined) options.actions = payload.actions;
   if (payload.timestamp !== undefined) options.timestamp = payload.timestamp;
   if (payload.requireInteraction !== undefined) {

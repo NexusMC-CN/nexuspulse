@@ -8,6 +8,7 @@ import {
   requestNotificationPermission,
   showNotification,
 } from "./notifications.js";
+import { resolveNotificationUrl } from "./notification-url.js";
 import {
   subscribePush as subscribePushAdapter,
   unsubscribePush as unsubscribePushAdapter,
@@ -165,6 +166,37 @@ export class NexusPulse {
   notify(payload: NotificationPayload): Notification {
     try {
       const notification = showNotification(payload, this.runtimeForAdapters());
+      const clickUrl = payload.url;
+      if (clickUrl !== undefined) {
+        notification.onclick = () => {
+          try {
+            const runtime = this.runtimeForAdapters() as {
+              location?: { origin?: string; assign?: (url: string) => void };
+              focus?: () => void;
+            };
+            const targetUrl = resolveNotificationUrl(
+              clickUrl,
+              runtime.location?.origin,
+              this.options.security?.allowedOrigins ??
+                this.options.allowedOrigins ??
+                [],
+            );
+            if (!targetUrl) return;
+            if (typeof runtime.location?.assign !== "function") {
+              throw new InvalidConfigurationError(
+                "Notification click navigation is not supported",
+              );
+            }
+            runtime.focus?.();
+            runtime.location.assign(targetUrl.href);
+          } catch (error) {
+            this.emit(
+              "error",
+              error instanceof Error ? error : new Error(String(error)),
+            );
+          }
+        };
+      }
       this.emit("notification", payload);
       return notification;
     } catch (error) {

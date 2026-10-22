@@ -86,32 +86,107 @@ describe("NexusPulse service worker entry", () => {
     expect(openWindow).not.toHaveBeenCalled();
   });
 
-  it("reuses any same-origin window before opening a different notification URL", async () => {
+  it.each([
+    {
+      name: "completed file",
+      payload: {
+        title: "文件上传完成",
+        url: "/files/file-1",
+        data: { fileId: "file-1", status: "completed" },
+      },
+      expectedData: {
+        fileId: "file-1",
+        status: "completed",
+        url: "/files/file-1",
+      },
+      expectedUrl: "https://app.example.test/files/file-1",
+    },
+    {
+      name: "failed upload without a file ID",
+      payload: {
+        title: "文件上传失败",
+        url: "/uploads/upload-123",
+        data: { uploadId: "upload-123", status: "failed" },
+      },
+      expectedData: {
+        uploadId: "upload-123",
+        status: "failed",
+        url: "/uploads/upload-123",
+      },
+      expectedUrl: "https://app.example.test/uploads/upload-123",
+    },
+  ])(
+    "opens $name details while preserving metadata when another page is open",
+    async ({ payload, expectedData, expectedUrl }) => {
+      const { scope, listeners, showNotification, matchAll, openWindow } =
+        createScope();
+      const client = {
+        url: "https://app.example.test/",
+        focus: vi.fn().mockResolvedValue(undefined),
+        postMessage: vi.fn(),
+      };
+      const openedClient = { postMessage: vi.fn() };
+      matchAll.mockResolvedValue([client]);
+      openWindow.mockResolvedValue(openedClient);
+      installNexusPulseServiceWorker({ scope });
+
+      const waitUntil = vi.fn((promise: Promise<unknown>) => promise);
+      dispatch(listeners, "push", {
+        data: {
+          json: () => payload,
+        },
+        waitUntil,
+      });
+      await waitUntil.mock.results[0]?.value;
+      const notificationData = showNotification.mock.calls[0]?.[1]?.data;
+
+      dispatch(listeners, "notificationclick", {
+        notification: {
+          close: vi.fn(),
+          data: notificationData,
+        },
+        waitUntil,
+      });
+
+      await waitUntil.mock.results[1]?.value;
+      expect(notificationData).toEqual(expectedData);
+      expect(client.focus).not.toHaveBeenCalled();
+      expect(openWindow).toHaveBeenCalledWith(expectedUrl);
+      expect(openedClient.postMessage).toHaveBeenCalledWith({
+        type: "nexuspulse:notification-click",
+        action: undefined,
+        data: notificationData,
+      });
+    },
+  );
+
+  it("focuses an existing window already showing the notification URL", async () => {
     const { scope, listeners, matchAll, openWindow } = createScope();
-    const client = {
+    const otherClient = {
       url: "https://app.example.test/",
       focus: vi.fn().mockResolvedValue(undefined),
       postMessage: vi.fn(),
     };
-    matchAll.mockResolvedValue([client]);
+    const targetClient = {
+      url: "https://app.example.test/files/file-1",
+      focus: vi.fn().mockResolvedValue(undefined),
+      postMessage: vi.fn(),
+    };
+    matchAll.mockResolvedValue([otherClient, targetClient]);
     installNexusPulseServiceWorker({ scope });
 
     const waitUntil = vi.fn((promise: Promise<unknown>) => promise);
     dispatch(listeners, "notificationclick", {
       notification: {
         close: vi.fn(),
-        data: { url: "/inbox", id: "n-2" },
+        data: { url: "/files/file-1", fileId: "file-1" },
       },
       waitUntil,
     });
 
     await waitUntil.mock.results[0]?.value;
-    expect(client.focus).toHaveBeenCalledOnce();
-    expect(client.postMessage).toHaveBeenCalledWith({
-      type: "nexuspulse:notification-click",
-      action: undefined,
-      data: { url: "/inbox", id: "n-2" },
-    });
+    expect(targetClient.focus).toHaveBeenCalledOnce();
+    expect(otherClient.focus).not.toHaveBeenCalled();
     expect(openWindow).not.toHaveBeenCalled();
   });
 

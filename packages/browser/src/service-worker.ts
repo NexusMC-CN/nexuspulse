@@ -1,7 +1,5 @@
-import {
-  InvalidConfigurationError,
-  UnsupportedFeatureError,
-} from "./errors.js";
+import { UnsupportedFeatureError } from "./errors.js";
+import { resolveNotificationUrl } from "./notification-url.js";
 import type { NotificationAction, NotificationPayload } from "./types.js";
 
 export interface NexusPulseWorkerClient {
@@ -132,37 +130,6 @@ function notificationOptions(
   return options;
 }
 
-function originOf(value: string): string | undefined {
-  try {
-    return new URL(value).origin;
-  } catch {
-    return undefined;
-  }
-}
-
-function resolveClickUrl(
-  rawUrl: unknown,
-  baseOrigin: string | undefined,
-): URL | undefined {
-  if (typeof rawUrl !== "string" || rawUrl.length === 0) return undefined;
-  try {
-    return new URL(rawUrl, baseOrigin);
-  } catch {
-    throw new InvalidConfigurationError(
-      "Notification click URL must be a valid absolute or relative URL",
-    );
-  }
-}
-
-function isAllowedOrigin(
-  url: URL,
-  baseOrigin: string | undefined,
-  allowedOrigins: string[],
-): boolean {
-  if (url.origin === baseOrigin) return true;
-  return allowedOrigins.some((origin) => originOf(origin) === url.origin);
-}
-
 async function handlePush(
   scope: NexusPulseWorkerScope,
   event: NexusPulsePushEvent,
@@ -187,36 +154,26 @@ async function handleNotificationClick(
     ? event.notification.data
     : undefined;
   const baseOrigin = scope.location?.origin;
-  const targetUrl = resolveClickUrl(data?.url, baseOrigin);
-
-  if (targetUrl && !isAllowedOrigin(targetUrl, baseOrigin, allowedOrigins)) {
-    throw new InvalidConfigurationError(
-      `Notification click URL uses a disallowed origin: ${targetUrl.origin}`,
-    );
-  }
+  const targetUrl = resolveNotificationUrl(
+    data?.url,
+    baseOrigin,
+    allowedOrigins,
+  );
 
   const clients = await scope.clients.matchAll({
     type: "window",
     includeUncontrolled: true,
   });
-  const sameOriginClient = clients.find((client) => {
-    if (!baseOrigin) return false;
+  const matchingClient = clients.find((client) => {
     try {
-      return new URL(client.url).origin === baseOrigin;
+      const clientUrl = new URL(client.url);
+      return targetUrl
+        ? clientUrl.href === targetUrl.href
+        : clientUrl.origin === baseOrigin;
     } catch {
       return false;
     }
   });
-  const matchingClient =
-    sameOriginClient ??
-    clients.find((client) => {
-      if (!targetUrl) return false;
-      try {
-        return new URL(client.url).href === targetUrl.href;
-      } catch {
-        return false;
-      }
-    });
 
   if (matchingClient) {
     await matchingClient.focus?.();

@@ -4,6 +4,7 @@ import {
   InvalidSubscriptionInputError,
   NotificationService,
   normalizePushSubscriptionInput,
+  type NotificationPayload,
   type PushSubscriptionRecord,
   type PushSubscriptionInput,
   type SubscriptionStore,
@@ -99,6 +100,120 @@ describe("NotificationService", () => {
     expect(result.push.removed).toBe(1);
     expect(result.websocket.sent).toBe(true);
     expect(records).toHaveLength(0);
+  });
+
+  it("still publishes a notification over websocket when push subscription lookup fails", async () => {
+    const { store } = createStore();
+    const lookupError = new Error("subscription store unavailable");
+    store.listByUser = async () => {
+      throw lookupError;
+    };
+    const delivered: Array<{
+      title: string;
+      url?: string;
+      data?: Record<string, unknown>;
+    }> = [];
+    const service = new NotificationService({
+      store,
+      push: { send: async () => undefined },
+      realtime: {
+        publish: async (_userId, payload) => {
+          delivered.push(payload);
+        },
+      },
+    });
+    const payload = {
+      title: "文件上传完成",
+      url: "/files/file-1",
+      data: { fileId: "file-1", status: "completed" },
+    };
+
+    const result = await service.send("user-1", payload);
+
+    expect(delivered).toEqual([payload]);
+    expect(result.websocket).toMatchObject({ sent: true, failed: false });
+    expect(result.push).toMatchObject({
+      sent: 0,
+      failed: 1,
+      skipped: false,
+      errors: [lookupError],
+    });
+  });
+
+  it("delivers an upload failure link without requiring a file ID", async () => {
+    const { store } = createStore([
+      { ...subscription, id: "sub-1", userId: "user-1" },
+    ]);
+    const pushPayloads: NotificationPayload[] = [];
+    const realtimePayloads: NotificationPayload[] = [];
+    const service = new NotificationService({
+      store,
+      subscriptionValidation: {
+        allowedEndpointOrigins: ["https://push.example"],
+      },
+      push: {
+        send: async (_subscription, payload) => {
+          pushPayloads.push(payload);
+        },
+      },
+      realtime: {
+        publish: async (_userId, payload) => {
+          realtimePayloads.push(payload);
+        },
+      },
+    });
+    const failure: NotificationPayload = {
+      title: "文件上传失败",
+      url: "/uploads/upload-123",
+      data: {
+        kind: "file-upload",
+        status: "failed",
+        uploadId: "upload-123",
+      },
+    };
+
+    const result = await service.send("user-1", failure);
+
+    const expectedDelivery: NotificationPayload = {
+      title: "文件上传失败",
+      url: "/uploads/upload-123",
+      data: {
+        kind: "file-upload",
+        status: "failed",
+        uploadId: "upload-123",
+      },
+    };
+    expect(pushPayloads).toStrictEqual([expectedDelivery]);
+    expect(realtimePayloads).toStrictEqual([expectedDelivery]);
+    expect(result.push).toMatchObject({ sent: 1, failed: 0 });
+    expect(result.websocket).toMatchObject({ sent: true, failed: false });
+  });
+
+  it("starts websocket delivery without waiting for push subscription lookup", async () => {
+    const { store } = createStore();
+    let resolveSubscriptions!: (records: PushSubscriptionRecord[]) => void;
+    store.listByUser = () =>
+      new Promise<PushSubscriptionRecord[]>((resolve) => {
+        resolveSubscriptions = resolve;
+      });
+    const delivered: string[] = [];
+    const service = new NotificationService({
+      store,
+      push: { send: async () => undefined },
+      realtime: {
+        publish: async (_userId, payload) => {
+          delivered.push(payload.title);
+        },
+      },
+    });
+
+    const sending = service.send("user-1", { title: "文件上传完成" });
+    const publishedBeforeLookupFinished = delivered.length;
+    resolveSubscriptions([]);
+    await sending;
+
+    expect(publishedBeforeLookupFinished).toBe(1);
+    expect(delivered).toEqual(["文件上传完成"]);
   });
 
   it("reports unavailable transports without constructing platform storage", async () => {

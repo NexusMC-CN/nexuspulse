@@ -155,6 +155,171 @@ describe("NexusPulse runtime coordinator", () => {
     expect(notifications).toEqual([payload]);
   });
 
+  it("opens the file detail page when a foreground notification is clicked", () => {
+    const assign = vi.fn();
+    const focus = vi.fn();
+    const runtime = {
+      Notification: vi.fn(function Notification(
+        title: string,
+        options?: NotificationOptions,
+      ) {
+        return { title, data: options?.data, onclick: null };
+      }),
+      location: { origin: "https://app.example.test", assign },
+      focus,
+    };
+    const pulse = createNexusPulse({}, runtime);
+    const notification = pulse.notify({
+      title: "文件上传完成",
+      data: { fileId: "file-1" },
+      url: "/files/file-1",
+    });
+
+    (notification as unknown as { onclick?: () => void }).onclick?.();
+
+    expect(notification.data).toEqual({
+      fileId: "file-1",
+      url: "/files/file-1",
+    });
+    expect(focus).toHaveBeenCalledOnce();
+    expect(assign).toHaveBeenCalledWith(
+      "https://app.example.test/files/file-1",
+    );
+  });
+
+  it("keeps the displayed file URL when the payload changes before clicking", () => {
+    const assign = vi.fn();
+    const runtime = {
+      Notification: vi.fn(function Notification(
+        title: string,
+        options?: NotificationOptions,
+      ) {
+        return { title, data: options?.data, onclick: null };
+      }),
+      location: { origin: "https://app.example.test", assign },
+    };
+    const pulse = createNexusPulse({}, runtime);
+    const payload = {
+      title: "文件上传完成",
+      data: { fileId: "file-1" },
+      url: "/files/file-1",
+    };
+    const notification = pulse.notify(payload);
+
+    payload.url = "/files/file-2";
+    (notification as unknown as { onclick?: () => void }).onclick?.();
+
+    expect(notification.data).toEqual({
+      fileId: "file-1",
+      url: "/files/file-1",
+    });
+    expect(assign).toHaveBeenCalledWith(
+      "https://app.example.test/files/file-1",
+    );
+  });
+
+  it("opens upload failure details from a default-decoded websocket notification", async () => {
+    const { runtime: socketRuntimeValue, sockets } = socketRuntime();
+    const shown: Array<{
+      data?: unknown;
+      onclick: (() => void) | null;
+    }> = [];
+    const assign = vi.fn();
+    const pulse = createNexusPulse(
+      { webSocket: { url: "wss://app.example.test/notifications" } },
+      {
+        ...socketRuntimeValue,
+        Notification: vi.fn(function Notification(
+          _title: string,
+          options?: NotificationOptions,
+        ) {
+          const notification = {
+            data: options?.data,
+            onclick: null as (() => void) | null,
+          };
+          shown.push(notification);
+          return notification;
+        }),
+        location: { origin: "https://app.example.test", assign },
+      },
+    );
+    const received: unknown[] = [];
+    pulse.on("message", (payload) => received.push(payload));
+    const connected = pulse.connect();
+    sockets[0].onopen();
+    await connected;
+    const failure = {
+      title: "文件上传失败",
+      url: "/uploads/upload-123",
+      data: {
+        kind: "file-upload",
+        status: "failed",
+        uploadId: "upload-123",
+      },
+    };
+
+    sockets[0].onmessage({ data: JSON.stringify(failure) });
+    shown[0]?.onclick?.();
+
+    expect(received).toEqual([failure]);
+    expect(shown[0]?.data).toEqual({
+      kind: "file-upload",
+      status: "failed",
+      uploadId: "upload-123",
+      url: "/uploads/upload-123",
+    });
+    expect(assign).toHaveBeenCalledWith(
+      "https://app.example.test/uploads/upload-123",
+    );
+  });
+
+  it("does not open a foreground notification URL from an unapproved origin", () => {
+    const assign = vi.fn();
+    const runtime = {
+      Notification: vi.fn(function Notification(title: string) {
+        return { title, onclick: null };
+      }),
+      location: { origin: "https://app.example.test", assign },
+    };
+    const pulse = createNexusPulse({}, runtime);
+    const errors: Error[] = [];
+    pulse.on("error", (error) => errors.push(error));
+    const notification = pulse.notify({
+      title: "文件上传完成",
+      url: "https://other.example.test/files/file-1",
+    });
+
+    (notification as unknown as { onclick?: () => void }).onclick?.();
+
+    expect(assign).not.toHaveBeenCalled();
+    expect(errors).toHaveLength(1);
+    expect(errors[0]?.message).toMatch(/disallowed origin/i);
+  });
+
+  it("opens an explicitly approved cross-origin file detail page", () => {
+    const assign = vi.fn();
+    const runtime = {
+      Notification: vi.fn(function Notification(title: string) {
+        return { title, onclick: null };
+      }),
+      location: { origin: "https://app.example.test", assign },
+    };
+    const pulse = createNexusPulse(
+      { security: { allowedOrigins: ["https://files.example.test"] } },
+      runtime,
+    );
+    const notification = pulse.notify({
+      title: "文件上传完成",
+      url: "https://files.example.test/files/file-1",
+    });
+
+    (notification as unknown as { onclick?: () => void }).onclick?.();
+
+    expect(assign).toHaveBeenCalledWith(
+      "https://files.example.test/files/file-1",
+    );
+  });
+
   it("subscribes and unsubscribes push using configured options", async () => {
     const subscription = { unsubscribe: vi.fn().mockResolvedValue(true) };
     const register = vi.fn().mockResolvedValue({

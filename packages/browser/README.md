@@ -72,7 +72,7 @@ installNexusPulseServiceWorker();
 }
 ```
 
-通知点击时，NexusPulse 会优先查找并聚焦已有窗口，再向该窗口发送 `nexuspulse:notification-click` 消息；没有匹配窗口时才打开允许的 URL。默认只允许当前页面同源地址。如确实需要跳转到其他源，应在 Service Worker 安装器中显式配置 `allowedOrigins`，并在服务端限制可发送的 URL。
+Push 通知点击时，如果 Service Worker 能枚举到已打开的目标页面，NexusPulse 会聚焦该窗口并发送 `nexuspulse:notification-click` 消息；否则直接打开 `url`，并向新窗口尝试发送点击消息。跨源页面即使已打开也不会被 `clients.matchAll()` 枚举到。页面应根据 URL 加载内容，不依赖点击消息一定送达。没有 `url` 时会聚焦已有同源窗口。默认只允许当前页面同源地址。如确实需要跳转到其他源，应在 Service Worker 安装器中显式配置 `allowedOrigins`，并在服务端限制可发送的 URL。
 
 ```ts
 installNexusPulseServiceWorker({
@@ -100,19 +100,12 @@ await pulse.unsubscribePush();
 
 ## WebSocket
 
-WebSocket 消息通过 `decodeMessage` 归一化为 `NotificationPayload`：
+WebSocket 消息默认按 JSON 解码为 `NotificationPayload`，并保留 `data` 和顶层 `url`：
 
 ```ts
 const pulse = createNexusPulse({
   webSocket: {
     url: "wss://example.test/notifications",
-    decodeMessage(message) {
-      const value = JSON.parse(String(message)) as {
-        title: string;
-        body?: string;
-      };
-      return { title: value.title, body: value.body };
-    },
     reconnect: {
       maxAttempts: 3,
       initialDelay: 250,
@@ -128,6 +121,17 @@ pulse.on("message", (payload) => {
 });
 
 pulse.disconnect();
+```
+
+服务端消息格式不同时可配置 `decodeMessage`；转换时需保留 `data` 和顶层 `url`，否则文件 ID、上传 ID 和点击链接会丢失。
+
+WebSocket 收到通知后会自动展示前台系统通知。顶层 `url` 会写入通知的 `data.url`，点击时由当前页面打开该地址；默认只允许同源 URL。跨源文件详情页还需在窗口端配置 `security.allowedOrigins`，并为 Push 点击单独配置上文的 Service Worker `allowedOrigins`。成功通知的文件 ID 应放在 `data.fileId`；失败时尚无文件 ID，可用 `data.uploadId` 和失败详情页 `url`。通知 `id` 不代替文件 ID 或上传 ID。
+
+```ts
+const pulse = createNexusPulse({
+  security: { allowedOrigins: ["https://files.example.test"] },
+  webSocket: { url: "wss://example.test/notifications" },
+});
 ```
 
 默认不自动重连。配置 `reconnect` 后使用指数退避，达到 `maxAttempts` 会发出 `error` 事件并停止连接。`connect()` 只会在连接成功后 resolve；初始连接失败、连接在打开前关闭或主动断开时会 reject `ConnectionError`。
