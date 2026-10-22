@@ -131,7 +131,10 @@ describe("service worker and push adapter", () => {
       {
         serviceWorker: { registration: configured },
         applicationServerKey: "key",
-        subscribeOptions: { userVisibleOnly: undefined },
+        // JavaScript callers can pass an explicit undefined despite the DOM type.
+        subscribeOptions: {
+          userVisibleOnly: undefined,
+        } as unknown as PushSubscriptionOptionsInit,
       },
       { Notification: { permission: "granted" } },
     );

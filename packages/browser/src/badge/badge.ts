@@ -11,8 +11,8 @@ type SetBadge = (count?: number) => void | Promise<void>;
 type ClearBadge = () => void | Promise<void>;
 
 function getBadgingMethods(runtime: unknown): {
-  set?: SetBadge;
-  clear?: ClearBadge;
+  set: SetBadge | undefined;
+  clear: ClearBadge | undefined;
 } {
   const root = asRecord(runtime);
   const navigator = asRecord(root?.navigator);

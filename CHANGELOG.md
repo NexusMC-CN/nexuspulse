@@ -1,5 +1,21 @@
 # 更新记录
 
+## 未发布
+
+### `@nexusmc-cn/nexuspulse`
+
+- 新增 `webSocket.autoNotify` 选项。设为 `false` 时仍触发 `message` 事件，但不自动显示系统通知；默认行为保持不变。
+- 启用 `noUncheckedIndexedAccess` 和 `exactOptionalPropertyTypes`，收紧事件监听器与可选属性的类型约束，并补充协议类型的 `import type` 用法。
+
+### `@nexusmc-cn/nexuspulse-server`
+
+- 按核心类型、通知服务和 Fastify 集成整理内部源码目录，保留现有包入口与公开导出。
+
+### 工程
+
+- 新增 Ubuntu 和 Windows、Node.js 22 和 24 的 CI 检查，覆盖构建、类型检查、测试、格式检查及两个包的打包验证。
+- 将开发工具更新至 TypeScript 6、tsup 9、Vitest 5 和 Node.js 26 类型声明。
+
 ## 0.1.2 — 2026-10-17
 
 ### `@nexusmc-cn/nexuspulse`

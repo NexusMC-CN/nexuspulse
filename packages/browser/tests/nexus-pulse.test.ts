@@ -5,6 +5,7 @@ import {
   NexusPulse,
   InvalidConfigurationError,
 } from "../src/index.js";
+import { atOrThrow } from "./at-or-throw.js";
 
 function notificationRuntime() {
   const shown = vi.fn(function Notification(this: unknown, title: string) {
@@ -246,7 +247,7 @@ describe("NexusPulse runtime coordinator", () => {
     const received: unknown[] = [];
     pulse.on("message", (payload) => received.push(payload));
     const connected = pulse.connect();
-    sockets[0].onopen();
+    atOrThrow(sockets, 0).onopen();
     await connected;
     const failure = {
       title: "文件上传失败",
@@ -258,7 +259,7 @@ describe("NexusPulse runtime coordinator", () => {
       },
     };
 
-    sockets[0].onmessage({ data: JSON.stringify(failure) });
+    atOrThrow(sockets, 0).onmessage({ data: JSON.stringify(failure) });
     shown[0]?.onclick?.();
 
     expect(received).toEqual([failure]);
@@ -315,6 +316,55 @@ describe("NexusPulse runtime coordinator", () => {
 
     (notification as unknown as { onclick?: () => void }).onclick?.();
 
+    expect(assign).toHaveBeenCalledWith(
+      "https://files.example.test/files/file-1",
+    );
+  });
+
+  it("uses the top-level origin fallback only when security origins are absent", () => {
+    const assign = vi.fn();
+    const runtime = {
+      Notification: vi.fn(function Notification(title: string) {
+        return { title, onclick: null };
+      }),
+      location: { origin: "https://app.example.test", assign },
+    };
+    const aliasPulse = createNexusPulse(
+      { allowedOrigins: ["https://legacy.example.test"] },
+      runtime,
+    );
+    const aliasNotification = aliasPulse.notify({
+      title: "旧配置",
+      url: "https://legacy.example.test/files/file-1",
+    });
+    (aliasNotification as unknown as { onclick?: () => void }).onclick?.();
+    expect(assign).toHaveBeenCalledWith(
+      "https://legacy.example.test/files/file-1",
+    );
+
+    assign.mockClear();
+    const securePulse = createNexusPulse(
+      {
+        allowedOrigins: ["https://legacy.example.test"],
+        security: { allowedOrigins: ["https://files.example.test"] },
+      },
+      runtime,
+    );
+    const errors: Error[] = [];
+    securePulse.on("error", (error) => errors.push(error));
+    const blockedNotification = securePulse.notify({
+      title: "旧配置",
+      url: "https://legacy.example.test/files/file-1",
+    });
+    (blockedNotification as unknown as { onclick?: () => void }).onclick?.();
+    expect(assign).not.toHaveBeenCalled();
+    expect(errors[0]?.message).toMatch(/disallowed origin/i);
+
+    const allowedNotification = securePulse.notify({
+      title: "新配置",
+      url: "https://files.example.test/files/file-1",
+    });
+    (allowedNotification as unknown as { onclick?: () => void }).onclick?.();
     expect(assign).toHaveBeenCalledWith(
       "https://files.example.test/files/file-1",
     );
@@ -394,15 +444,43 @@ describe("NexusPulse runtime coordinator", () => {
     pulse.on("disconnected", disconnected);
 
     const connecting = pulse.connect();
-    sockets[0].onopen();
+    atOrThrow(sockets, 0).onopen();
     await connecting;
-    sockets[0].onmessage({ data: "payload" });
+    atOrThrow(sockets, 0).onmessage({ data: "payload" });
     pulse.disconnect();
 
     expect(events).toEqual(["message", "notification"]);
     expect(notifications.Notification).toHaveBeenCalledWith("Ping", {});
     expect(connected).toHaveBeenCalledOnce();
     expect(disconnected).toHaveBeenCalledOnce();
+  });
+
+  it("emits only the message when WebSocket auto notification is disabled", async () => {
+    const { runtime, sockets } = socketRuntime();
+    const notifications = notificationRuntime();
+    const pulse = createNexusPulse(
+      {
+        webSocket: {
+          url: "ws://example.test",
+          autoNotify: false,
+          decodeMessage: () => ({ title: "Ping" }),
+        },
+      },
+      { ...runtime, ...notifications },
+    );
+    const events: string[] = [];
+    pulse.on("message", (payload) => events.push(`message:${payload.title}`));
+    pulse.on("notification", () => events.push("notification"));
+    pulse.on("error", () => events.push("error"));
+
+    const connecting = pulse.connect();
+    atOrThrow(sockets, 0).onopen();
+    await connecting;
+    atOrThrow(sockets, 0).onmessage({ data: "payload" });
+
+    expect(events).toEqual(["message:Ping"]);
+    expect(notifications.Notification).not.toHaveBeenCalled();
+    pulse.disconnect();
   });
 
   it("requires websocket configuration and reports badge errors", async () => {

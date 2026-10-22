@@ -27,18 +27,29 @@ type Listener<K extends keyof NexusPulseEventMap> = (
   value: NexusPulseEventMap[K],
 ) => void;
 
+type ListenerStore = {
+  [K in keyof NexusPulseEventMap]: Set<Listener<K>>;
+};
+
 export class NexusPulse {
   private currentState: NexusPulseState = "idle";
-  private readonly listeners = new Map<
-    keyof NexusPulseEventMap,
-    Set<(...args: any[]) => void>
-  >();
+  private readonly listeners: ListenerStore = {
+    statechange: new Set(),
+    ready: new Set(),
+    permissionchange: new Set(),
+    subscriptionchange: new Set(),
+    message: new Set(),
+    notification: new Set(),
+    connected: new Set(),
+    disconnected: new Set(),
+    error: new Set(),
+  };
   private initialized = false;
-  private initializationPromise?: Promise<void>;
+  private initializationPromise: Promise<void> | undefined;
   private disposed = false;
   private websocket?: WebSocketManager;
   private serviceWorkerRegistration?: ServiceWorkerRegistration;
-  private pushSubscription?: PushSubscription;
+  private pushSubscription: PushSubscription | undefined;
   private readonly runtime: unknown;
 
   constructor(
@@ -65,13 +76,9 @@ export class NexusPulse {
     listener: Listener<K>,
   ): () => void {
     if (this.disposed) return () => undefined;
-    let listeners = this.listeners.get(event);
-    if (!listeners) {
-      listeners = new Set();
-      this.listeners.set(event, listeners);
-    }
-    listeners.add(listener as (...args: any[]) => void);
-    return () => listeners?.delete(listener as (...args: any[]) => void);
+    const listeners = this.listeners[event];
+    listeners.add(listener);
+    return () => listeners.delete(listener);
   }
 
   private emit<K extends keyof NexusPulseEventMap>(
@@ -79,7 +86,7 @@ export class NexusPulse {
     value: NexusPulseEventMap[K],
   ): void {
     if (this.disposed) return;
-    for (const listener of this.listeners.get(event) ?? []) {
+    for (const listener of this.listeners[event]) {
       try {
         listener(value);
       } catch (error) {
@@ -219,7 +226,7 @@ export class NexusPulse {
       const subscription = await subscribePushAdapter(
         {
           ...this.options.push,
-          serviceWorker,
+          ...(serviceWorker === undefined ? {} : { serviceWorker }),
         },
         this.runtimeForAdapters() as any,
       );
@@ -277,10 +284,12 @@ export class NexusPulse {
           },
           onMessage: (payload) => {
             this.emit("message", payload);
-            try {
-              this.notify(payload);
-            } catch {
-              /* notify already emitted the adapter error */
+            if (this.options.webSocket?.autoNotify !== false) {
+              try {
+                this.notify(payload);
+              } catch {
+                /* notify already emitted the adapter error */
+              }
             }
           },
           onError: (error: ConnectionError) => this.emit("error", error),
@@ -327,7 +336,7 @@ export class NexusPulse {
     this.websocket?.disconnect();
     this.currentState = "stopped";
     this.disposed = true;
-    this.listeners.clear();
+    for (const listeners of Object.values(this.listeners)) listeners.clear();
   }
 }
 

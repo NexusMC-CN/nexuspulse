@@ -61,7 +61,14 @@ installNexusPulseServiceWorker();
 
 将产物部署到与页面同源的 `/nexuspulse-sw.js`，然后把相同路径传给 `serviceWorker.url`。Push 数据应为 JSON 格式的 `NotificationPayload`，例如：
 
-`NotificationPayload` 和 `NotificationAction` 也可以从 `@nexusmc-cn/nexuspulse/protocol` 导入；服务端包复用这组协议类型，避免两端维护不同定义。
+`@nexusmc-cn/nexuspulse/protocol` 仅导出类型，没有运行时值；请使用类型导入。服务端包复用这组协议类型，避免两端维护不同定义。
+
+```ts
+import type {
+  NotificationAction,
+  NotificationPayload,
+} from "@nexusmc-cn/nexuspulse/protocol";
+```
 
 ```json
 {
@@ -125,7 +132,18 @@ pulse.disconnect();
 
 服务端消息格式不同时可配置 `decodeMessage`；转换时需保留 `data` 和顶层 `url`，否则文件 ID、上传 ID 和点击链接会丢失。
 
-WebSocket 收到通知后会自动展示前台系统通知。顶层 `url` 会写入通知的 `data.url`，点击时由当前页面打开该地址；默认只允许同源 URL。跨源文件详情页还需在窗口端配置 `security.allowedOrigins`，并为 Push 点击单独配置上文的 Service Worker `allowedOrigins`。成功通知的文件 ID 应放在 `data.fileId`；失败时尚无文件 ID，可用 `data.uploadId` 和失败详情页 `url`。通知 `id` 不代替文件 ID 或上传 ID。
+默认情况下，WebSocket 收到消息后会先触发 `message`，再展示前台系统通知并触发 `notification`。如果只需要处理站内消息，可设置 `webSocket.autoNotify: false`；此时仍触发 `message`，但不会自动展示系统通知。显式调用 `pulse.notify()` 和 Push 通知不受此开关影响。
+
+```ts
+const pulse = createNexusPulse({
+  webSocket: {
+    url: "wss://example.test/notifications",
+    autoNotify: false,
+  },
+});
+```
+
+自动展示的通知会把顶层 `url` 写入 `data.url`，点击时由当前页面打开该地址；默认只允许同源 URL。跨源文件详情页还需在窗口端配置 `security.allowedOrigins`，并为 Push 点击单独配置上文的 Service Worker `allowedOrigins`。顶层 `allowedOrigins` 是窗口端的兼容别名；两者同时配置时，`security.allowedOrigins` 优先，包括设为空数组的情况。成功通知的文件 ID 应放在 `data.fileId`；失败时尚无文件 ID，可用 `data.uploadId` 和失败详情页 `url`。通知 `id` 不代替文件 ID 或上传 ID。
 
 ```ts
 const pulse = createNexusPulse({

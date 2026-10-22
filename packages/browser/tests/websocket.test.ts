@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 
 import { ConnectionError } from "../src/core/errors.js";
 import { WebSocketManager } from "../src/websocket/manager.js";
+import { atOrThrow } from "./at-or-throw.js";
 
 type FakeSocket = {
   onopen: (() => void) | null;
@@ -42,7 +43,7 @@ describe("WebSocketManager", () => {
     const connecting = manager.connect();
     expect(manager.state).toBe("connecting");
     expect(Constructor).toHaveBeenCalledWith("wss://example.test", ["json"]);
-    sockets[0].onopen?.();
+    atOrThrow(sockets, 0).onopen?.();
     await expect(connecting).resolves.toBeUndefined();
     expect(manager.state).toBe("connected");
   });
@@ -56,11 +57,11 @@ describe("WebSocketManager", () => {
     );
 
     const first = manager.connect();
-    sockets[0].onopen?.();
+    atOrThrow(sockets, 0).onopen?.();
     await first;
     const second = manager.connect();
     expect(Constructor).toHaveBeenCalledTimes(2);
-    sockets[1].onopen?.();
+    atOrThrow(sockets, 1).onopen?.();
     await expect(second).resolves.toBeUndefined();
   });
 
@@ -76,9 +77,9 @@ describe("WebSocketManager", () => {
 
     const connecting = manager.connect();
     manager.disconnect();
-    sockets[0].onopen?.();
-    sockets[0].onmessage?.({ data: "late" });
-    sockets[0].onclose?.();
+    atOrThrow(sockets, 0).onopen?.();
+    atOrThrow(sockets, 0).onmessage?.({ data: "late" });
+    atOrThrow(sockets, 0).onclose?.();
     await expect(connecting).rejects.toBeInstanceOf(ConnectionError);
 
     expect(manager.state).toBe("stopped");
@@ -100,10 +101,10 @@ describe("WebSocketManager", () => {
     );
 
     const connecting = manager.connect();
-    sockets[0].onopen?.();
+    atOrThrow(sockets, 0).onopen?.();
     await connecting;
-    sockets[0].onmessage?.({ data: "first" });
-    sockets[0].onmessage?.({ data: "second" });
+    atOrThrow(sockets, 0).onmessage?.({ data: "first" });
+    atOrThrow(sockets, 0).onmessage?.({ data: "second" });
 
     expect(decodeMessage).toHaveBeenNthCalledWith(1, "first");
     expect(onMessage).toHaveBeenCalledOnce();
@@ -120,12 +121,18 @@ describe("WebSocketManager", () => {
     );
 
     const connecting = manager.connect();
-    sockets[0].onopen?.();
+    atOrThrow(sockets, 0).onopen?.();
     await connecting;
-    sockets[0].onmessage?.({ data: "not-json" });
-    sockets[0].onmessage?.({ data: JSON.stringify({ body: "missing title" }) });
-    sockets[0].onmessage?.({ data: JSON.stringify({ title: "  " }) });
-    sockets[0].onmessage?.({ data: JSON.stringify({ title: "valid" }) });
+    atOrThrow(sockets, 0).onmessage?.({ data: "not-json" });
+    atOrThrow(sockets, 0).onmessage?.({
+      data: JSON.stringify({ body: "missing title" }),
+    });
+    atOrThrow(sockets, 0).onmessage?.({
+      data: JSON.stringify({ title: "  " }),
+    });
+    atOrThrow(sockets, 0).onmessage?.({
+      data: JSON.stringify({ title: "valid" }),
+    });
 
     expect(onMessage).toHaveBeenCalledOnce();
     expect(onMessage).toHaveBeenCalledWith({ title: "valid" });
@@ -139,9 +146,9 @@ describe("WebSocketManager", () => {
       { WebSocket: Constructor },
     );
     const connecting = manager.connect();
-    sockets[0].onopen?.();
+    atOrThrow(sockets, 0).onopen?.();
     await connecting;
-    sockets[0].onclose?.();
+    atOrThrow(sockets, 0).onclose?.();
     manager.disconnect();
     await vi.advanceTimersByTimeAsync(1000);
 
@@ -165,15 +172,15 @@ describe("WebSocketManager", () => {
       { WebSocket: Constructor },
     );
     const first = manager.connect();
-    sockets[0].onopen?.();
+    atOrThrow(sockets, 0).onopen?.();
     await first;
-    sockets[0].onclose?.();
+    atOrThrow(sockets, 0).onclose?.();
     await vi.advanceTimersByTimeAsync(9);
     expect(Constructor).toHaveBeenCalledOnce();
     await vi.advanceTimersByTimeAsync(1);
     expect(Constructor).toHaveBeenCalledTimes(2);
-    sockets[1].onopen?.();
-    sockets[1].onclose?.();
+    atOrThrow(sockets, 1).onopen?.();
+    atOrThrow(sockets, 1).onclose?.();
     await vi.advanceTimersByTimeAsync(19);
     expect(Constructor).toHaveBeenCalledTimes(2);
     await vi.advanceTimersByTimeAsync(1);
@@ -192,9 +199,9 @@ describe("WebSocketManager", () => {
       { WebSocket: Constructor },
     );
     const first = manager.connect();
-    sockets[0].onopen?.();
+    atOrThrow(sockets, 0).onopen?.();
     await first;
-    sockets[0].onclose?.();
+    atOrThrow(sockets, 0).onclose?.();
     await vi.advanceTimersByTimeAsync(1);
     expect(manager.state).toBe("stopped");
     expect(onError).toHaveBeenCalledWith(expect.any(ConnectionError));
@@ -213,14 +220,14 @@ describe("WebSocketManager", () => {
     );
 
     const first = manager.connect();
-    sockets[0].onclose?.();
+    atOrThrow(sockets, 0).onclose?.();
     await expect(first).rejects.toBeInstanceOf(ConnectionError);
     expect(manager.state).toBe("stopped");
     expect(onError).toHaveBeenCalledWith(expect.any(ConnectionError));
 
     const second = manager.connect();
     expect(Constructor).toHaveBeenCalledTimes(2);
-    sockets[1].onopen?.();
+    atOrThrow(sockets, 1).onopen?.();
     await expect(second).resolves.toBeUndefined();
   });
 
@@ -239,9 +246,9 @@ describe("WebSocketManager", () => {
     );
 
     const connecting = manager.connect();
-    const lateOpen = sockets[0].onopen;
-    const lateMessage = sockets[0].onmessage;
-    sockets[0].onclose?.();
+    const lateOpen = atOrThrow(sockets, 0).onopen;
+    const lateMessage = atOrThrow(sockets, 0).onmessage;
+    atOrThrow(sockets, 0).onclose?.();
     await expect(connecting).rejects.toBeInstanceOf(ConnectionError);
     lateOpen?.();
     lateMessage?.({ data: "late" });
@@ -260,7 +267,7 @@ describe("WebSocketManager", () => {
     );
 
     const connecting = manager.connect();
-    sockets[0].onclose?.();
+    atOrThrow(sockets, 0).onclose?.();
 
     await expect(connecting).rejects.toBeInstanceOf(ConnectionError);
     expect(manager.state).toBe("stopped");
@@ -275,9 +282,9 @@ describe("WebSocketManager", () => {
     );
 
     const connecting = manager.connect();
-    sockets[0].onerror?.();
+    atOrThrow(sockets, 0).onerror?.();
     await expect(connecting).rejects.toBeInstanceOf(ConnectionError);
-    sockets[0].onclose?.();
+    atOrThrow(sockets, 0).onclose?.();
     await vi.advanceTimersByTimeAsync(5);
 
     expect(Constructor).toHaveBeenCalledTimes(2);
@@ -292,12 +299,12 @@ describe("WebSocketManager", () => {
     );
 
     const first = manager.connect();
-    sockets[0].onopen?.();
+    atOrThrow(sockets, 0).onopen?.();
     await first;
-    sockets[0].onclose?.();
+    atOrThrow(sockets, 0).onclose?.();
     const manual = manager.connect();
     expect(Constructor).toHaveBeenCalledTimes(2);
-    sockets[1].onopen?.();
+    atOrThrow(sockets, 1).onopen?.();
     await manual;
     await vi.advanceTimersByTimeAsync(10);
 
@@ -327,12 +334,12 @@ describe("WebSocketManager", () => {
       { WebSocket: Constructor },
     );
     const connecting = manager.connect();
-    sockets[0].onerror?.();
+    atOrThrow(sockets, 0).onerror?.();
     await expect(connecting).rejects.toBeInstanceOf(ConnectionError);
     const recovered = manager.connect();
-    sockets[1].onopen?.();
+    atOrThrow(sockets, 1).onopen?.();
     await recovered;
-    sockets[1].onmessage?.({ data: "bad" });
+    atOrThrow(sockets, 1).onmessage?.({ data: "bad" });
     expect(onError).toHaveBeenCalledWith(expect.any(ConnectionError));
   });
 
@@ -346,11 +353,11 @@ describe("WebSocketManager", () => {
     );
 
     const first = manager.connect();
-    sockets[0].onerror?.();
+    atOrThrow(sockets, 0).onerror?.();
     await expect(first).rejects.toBeInstanceOf(ConnectionError);
     const second = manager.connect();
     expect(Constructor).toHaveBeenCalledTimes(2);
-    sockets[1].onopen?.();
+    atOrThrow(sockets, 1).onopen?.();
     await expect(second).resolves.toBeUndefined();
     expect(onError).toHaveBeenCalledWith(expect.any(ConnectionError));
   });

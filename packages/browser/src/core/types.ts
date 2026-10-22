@@ -23,6 +23,7 @@ export interface WebSocketReconnectOptions {
 export interface WebSocketOptions {
   url: string;
   protocols?: string | string[];
+  autoNotify?: boolean;
   reconnect?: boolean | WebSocketReconnectOptions;
   decodeMessage?: (message: unknown) => NotificationPayload | undefined | null;
 }
@@ -41,6 +42,7 @@ export interface NexusPulseOptions {
   webSocket?: WebSocketOptions;
   badge?: BadgeOptions;
   security?: ClickSecurityOptions;
+  /** @deprecated Use security.allowedOrigins for foreground notification clicks. */
   allowedOrigins?: string[];
 }
 

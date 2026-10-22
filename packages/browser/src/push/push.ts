@@ -44,9 +44,10 @@ export async function ensureServiceWorkerRegistration(
       "The Service Worker API is not supported",
     );
   }
-  const registration = await serviceWorker.register(options.url, {
-    scope: options.scope,
-  });
+  const registration = await serviceWorker.register(
+    options.url,
+    options.scope === undefined ? undefined : { scope: options.scope },
+  );
   return serviceWorker.ready ?? registration;
 }
 

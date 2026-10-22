@@ -67,13 +67,13 @@
   "devDependencies": {
     "@fastify/websocket": "^11.3.4",
     "@nexusmc-cn/nexuspulse": "0.1.2",
-    "@types/node": "^24.7.2",
+    "@types/node": "^26.6.5",
     "@types/ws": "^8.18.2",
     "fastify": "^5.12.5",
     "prettier": "^3.6.2",
-    "tsup": "^8.5.0",
-    "typescript": "^5.9.2",
-    "vitest": "^3.2.4"
+    "tsup": "^9.0.0",
+    "typescript": "^6.0.3",
+    "vitest": "^5.0.5"
   },
   "dependencies": {
     "fastify-plugin": "^5.1.0"

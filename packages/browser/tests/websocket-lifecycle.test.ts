@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ConnectionError, createNexusPulse } from "../src/index.js";
 import { WebSocketManager } from "../src/websocket/manager.js";
+import { atOrThrow } from "./at-or-throw.js";
 
 function socketRuntime(closeEvent?: "sync") {
   const sockets: Socket[] = [];
@@ -40,23 +41,23 @@ describe("WebSocket error cleanup", () => {
         runtime,
       );
       const connecting = manager.connect();
-      sockets[0].onopen?.();
+      atOrThrow(sockets, 0).onopen?.();
       await connecting;
-      const lateClose = sockets[0].onclose;
-      const lateError = sockets[0].onerror;
+      const lateClose = atOrThrow(sockets, 0).onclose;
+      const lateError = atOrThrow(sockets, 0).onerror;
 
-      sockets[0].onerror?.();
+      atOrThrow(sockets, 0).onerror?.();
 
-      expect(sockets[0].closed).toBe(true);
+      expect(atOrThrow(sockets, 0).closed).toBe(true);
       expect(vi.getTimerCount()).toBe(1);
       await vi.advanceTimersByTimeAsync(10);
       expect(sockets).toHaveLength(2);
-      sockets[1].onopen?.();
+      atOrThrow(sockets, 1).onopen?.();
       if (closeEvent === "delayed") lateClose?.();
       lateError?.();
 
       expect(manager.state).toBe("connected");
-      expect(sockets[1].closed).toBe(false);
+      expect(atOrThrow(sockets, 1).closed).toBe(false);
       expect(vi.getTimerCount()).toBe(0);
       await vi.advanceTimersByTimeAsync(1000);
       expect(sockets).toHaveLength(2);
@@ -69,19 +70,22 @@ describe("WebSocket error cleanup", () => {
     async (reconnect) => {
       const { runtime, sockets } = socketRuntime();
       const manager = new WebSocketManager(
-        { url: "wss://example.test", reconnect },
+        {
+          url: "wss://example.test",
+          ...(reconnect === undefined ? {} : { reconnect }),
+        },
         {},
         runtime,
       );
       const rejected = expect(manager.connect()).rejects.toBeInstanceOf(
         ConnectionError,
       );
-      const lateClose = sockets[0].onclose;
+      const lateClose = atOrThrow(sockets, 0).onclose;
 
-      sockets[0].onerror?.();
+      atOrThrow(sockets, 0).onerror?.();
       await rejected;
 
-      expect(sockets[0].closed).toBe(true);
+      expect(atOrThrow(sockets, 0).closed).toBe(true);
       expect(manager.state).toBe("stopped");
       lateClose?.();
       await vi.advanceTimersByTimeAsync(1000);
@@ -101,12 +105,12 @@ describe("WebSocket error cleanup", () => {
       ConnectionError,
     );
 
-    sockets[0].onerror?.();
+    atOrThrow(sockets, 0).onerror?.();
     await rejected;
     await vi.advanceTimersByTimeAsync(1000);
 
     expect(manager.state).toBe("stopped");
-    expect(sockets[0].closed).toBe(true);
+    expect(atOrThrow(sockets, 0).closed).toBe(true);
     expect(sockets).toHaveLength(1);
     expect(vi.getTimerCount()).toBe(0);
   });
@@ -132,16 +136,16 @@ describe("WebSocket error cleanup", () => {
       ConnectionError,
     );
 
-    sockets[0].onerror?.();
+    atOrThrow(sockets, 0).onerror?.();
     await rejected;
-    expect(sockets[0].closed).toBe(true);
+    expect(atOrThrow(sockets, 0).closed).toBe(true);
     expect(sockets).toHaveLength(2);
     expect(replacementState).toBe("pending");
-    sockets[1].onopen?.();
+    atOrThrow(sockets, 1).onopen?.();
 
     await expect(replacement).resolves.toBe("connected");
     expect(manager.state).toBe("connected");
-    expect(sockets[1].closed).toBe(false);
+    expect(atOrThrow(sockets, 1).closed).toBe(false);
     expect(vi.getTimerCount()).toBe(0);
     await vi.advanceTimersByTimeAsync(1000);
     expect(sockets).toHaveLength(2);
@@ -169,16 +173,16 @@ describe("WebSocket error cleanup", () => {
       ConnectionError,
     );
 
-    sockets[0].onclose?.();
+    atOrThrow(sockets, 0).onclose?.();
     await rejected;
 
     expect(sockets).toHaveLength(2);
     expect(replacementState).toBe("pending");
     expect(vi.getTimerCount()).toBe(0);
-    sockets[1].onopen?.();
+    atOrThrow(sockets, 1).onopen?.();
     await expect(replacement).resolves.toBe("connected");
     expect(manager.state).toBe("connected");
-    expect(sockets[1].closed).toBe(false);
+    expect(atOrThrow(sockets, 1).closed).toBe(false);
     await vi.advanceTimersByTimeAsync(1000);
     expect(sockets).toHaveLength(2);
     manager.disconnect();
@@ -191,7 +195,10 @@ describe("WebSocket error cleanup", () => {
       let replacement: Promise<string> | undefined;
       let replacementState = "pending";
       const manager = new WebSocketManager(
-        { url: "wss://example.test", reconnect },
+        {
+          url: "wss://example.test",
+          ...(reconnect === undefined ? {} : { reconnect }),
+        },
         {
           onStateChange: (state) => {
             if (state === "stopped" && !replacement) {
@@ -208,18 +215,18 @@ describe("WebSocket error cleanup", () => {
         runtime,
       );
       const connecting = manager.connect();
-      sockets[0].onopen?.();
+      atOrThrow(sockets, 0).onopen?.();
       await connecting;
 
-      sockets[0].onerror?.();
+      atOrThrow(sockets, 0).onerror?.();
       await Promise.resolve();
 
       expect(sockets).toHaveLength(2);
       expect(replacementState).toBe("pending");
-      expect(sockets[0].closed).toBe(true);
-      expect(sockets[1].closed).toBe(false);
+      expect(atOrThrow(sockets, 0).closed).toBe(true);
+      expect(atOrThrow(sockets, 1).closed).toBe(false);
       expect(vi.getTimerCount()).toBe(0);
-      sockets[1].onopen?.();
+      atOrThrow(sockets, 1).onopen?.();
       await expect(replacement).resolves.toBe("connected");
       expect(manager.state).toBe("connected");
       await vi.advanceTimersByTimeAsync(1000);
@@ -250,15 +257,15 @@ describe("WebSocket error cleanup", () => {
       ConnectionError,
     );
 
-    sockets[0].onerror?.();
+    atOrThrow(sockets, 0).onerror?.();
     await rejected;
 
     expect(sockets).toHaveLength(2);
     expect(replacementState).toBe("pending");
-    expect(sockets[0].closed).toBe(true);
-    expect(sockets[1].closed).toBe(false);
+    expect(atOrThrow(sockets, 0).closed).toBe(true);
+    expect(atOrThrow(sockets, 1).closed).toBe(false);
     expect(vi.getTimerCount()).toBe(0);
-    sockets[1].onopen?.();
+    atOrThrow(sockets, 1).onopen?.();
     await expect(replacement).resolves.toBe("connected");
     expect(manager.state).toBe("connected");
     await vi.advanceTimersByTimeAsync(1000);
@@ -285,13 +292,13 @@ describe("NexusPulse WebSocket cancellation", () => {
         runtime,
       );
       const connecting = pulse.connect();
-      sockets[0].onopen?.();
+      atOrThrow(sockets, 0).onopen?.();
       await connecting;
       pulse.on("statechange", (state) => {
         if (state === "connecting") pulse[cancel]();
       });
 
-      sockets[0].onclose?.();
+      atOrThrow(sockets, 0).onclose?.();
       expect(vi.getTimerCount()).toBe(1);
       await vi.advanceTimersByTimeAsync(10);
 
@@ -338,12 +345,12 @@ describe("NexusPulse WebSocket cancellation", () => {
 
     const connecting = pulse.connect();
     expect(sockets).toHaveLength(1);
-    sockets[0].onopen?.();
+    atOrThrow(sockets, 0).onopen?.();
     await expect(connecting).resolves.toBeUndefined();
 
     expect(pulse.state).toBe("connected");
     pulse.dispose();
-    expect(sockets[0].closed).toBe(true);
+    expect(atOrThrow(sockets, 0).closed).toBe(true);
     expect(vi.getTimerCount()).toBe(0);
   });
 
@@ -366,11 +373,11 @@ describe("NexusPulse WebSocket cancellation", () => {
     await expect(pulse.connect()).rejects.toBeInstanceOf(ConnectionError);
 
     expect(sockets).toHaveLength(1);
-    sockets[0].onopen?.();
+    atOrThrow(sockets, 0).onopen?.();
     await expect(replacement).resolves.toBeUndefined();
     expect(pulse.state).toBe("connected");
     pulse.dispose();
-    expect(sockets[0].closed).toBe(true);
+    expect(atOrThrow(sockets, 0).closed).toBe(true);
     expect(vi.getTimerCount()).toBe(0);
   });
 });
