@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ConnectionError, createNexusPulse } from "../src/index.js";
+import { WebSocketManager } from "../src/websocket.js";
 
-function socketRuntime() {
+function socketRuntime(closeEvent?: "sync") {
   const sockets: Socket[] = [];
   class Socket {
     onopen: (() => void) | null = null;
@@ -17,10 +18,254 @@ function socketRuntime() {
 
     close(): void {
       this.closed = true;
+      if (closeEvent === "sync") this.onclose?.();
     }
   }
   return { runtime: { WebSocket: Socket }, sockets };
 }
+
+describe("WebSocket error cleanup", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it.each(["none", "sync", "delayed"] as const)(
+    "closes an errored socket before retrying when close events are %s",
+    async (closeEvent) => {
+      const { runtime, sockets } = socketRuntime(
+        closeEvent === "sync" ? "sync" : undefined,
+      );
+      const manager = new WebSocketManager(
+        { url: "wss://example.test", reconnect: { initialDelay: 10 } },
+        {},
+        runtime,
+      );
+      const connecting = manager.connect();
+      sockets[0].onopen?.();
+      await connecting;
+      const lateClose = sockets[0].onclose;
+      const lateError = sockets[0].onerror;
+
+      sockets[0].onerror?.();
+
+      expect(sockets[0].closed).toBe(true);
+      expect(vi.getTimerCount()).toBe(1);
+      await vi.advanceTimersByTimeAsync(10);
+      expect(sockets).toHaveLength(2);
+      sockets[1].onopen?.();
+      if (closeEvent === "delayed") lateClose?.();
+      lateError?.();
+
+      expect(manager.state).toBe("connected");
+      expect(sockets[1].closed).toBe(false);
+      expect(vi.getTimerCount()).toBe(0);
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(sockets).toHaveLength(2);
+      manager.disconnect();
+    },
+  );
+
+  it.each([undefined, { maxAttempts: 1 }])(
+    "closes an unopened errored socket when reconnect is %j",
+    async (reconnect) => {
+      const { runtime, sockets } = socketRuntime();
+      const manager = new WebSocketManager(
+        { url: "wss://example.test", reconnect },
+        {},
+        runtime,
+      );
+      const rejected = expect(manager.connect()).rejects.toBeInstanceOf(
+        ConnectionError,
+      );
+      const lateClose = sockets[0].onclose;
+
+      sockets[0].onerror?.();
+      await rejected;
+
+      expect(sockets[0].closed).toBe(true);
+      expect(manager.state).toBe("stopped");
+      lateClose?.();
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(sockets).toHaveLength(1);
+      expect(vi.getTimerCount()).toBe(0);
+    },
+  );
+
+  it("does not reconnect after an error listener disconnects", async () => {
+    const { runtime, sockets } = socketRuntime();
+    const manager = new WebSocketManager(
+      { url: "wss://example.test", reconnect: { initialDelay: 10 } },
+      { onError: () => manager.disconnect() },
+      runtime,
+    );
+    const rejected = expect(manager.connect()).rejects.toBeInstanceOf(
+      ConnectionError,
+    );
+
+    sockets[0].onerror?.();
+    await rejected;
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(manager.state).toBe("stopped");
+    expect(sockets[0].closed).toBe(true);
+    expect(sockets).toHaveLength(1);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("keeps a replacement connection started synchronously by an error listener", async () => {
+    const { runtime, sockets } = socketRuntime();
+    let replacement: Promise<string> | undefined;
+    let replacementState = "pending";
+    const manager = new WebSocketManager(
+      { url: "wss://example.test", reconnect: { initialDelay: 10 } },
+      {
+        onError: () => {
+          manager.disconnect();
+          replacement = manager.connect().then(
+            () => (replacementState = "connected"),
+            () => (replacementState = "rejected"),
+          );
+        },
+      },
+      runtime,
+    );
+    const rejected = expect(manager.connect()).rejects.toBeInstanceOf(
+      ConnectionError,
+    );
+
+    sockets[0].onerror?.();
+    await rejected;
+    expect(sockets[0].closed).toBe(true);
+    expect(sockets).toHaveLength(2);
+    expect(replacementState).toBe("pending");
+    sockets[1].onopen?.();
+
+    await expect(replacement).resolves.toBe("connected");
+    expect(manager.state).toBe("connected");
+    expect(sockets[1].closed).toBe(false);
+    expect(vi.getTimerCount()).toBe(0);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(sockets).toHaveLength(2);
+    manager.disconnect();
+  });
+
+  it("keeps a replacement connection started by an unopened socket's close error listener", async () => {
+    const { runtime, sockets } = socketRuntime();
+    let replacement: Promise<string> | undefined;
+    let replacementState = "pending";
+    const manager = new WebSocketManager(
+      { url: "wss://example.test", reconnect: { initialDelay: 10 } },
+      {
+        onError: () => {
+          manager.disconnect();
+          replacement = manager.connect().then(
+            () => (replacementState = "connected"),
+            () => (replacementState = "rejected"),
+          );
+        },
+      },
+      runtime,
+    );
+    const rejected = expect(manager.connect()).rejects.toBeInstanceOf(
+      ConnectionError,
+    );
+
+    sockets[0].onclose?.();
+    await rejected;
+
+    expect(sockets).toHaveLength(2);
+    expect(replacementState).toBe("pending");
+    expect(vi.getTimerCount()).toBe(0);
+    sockets[1].onopen?.();
+    await expect(replacement).resolves.toBe("connected");
+    expect(manager.state).toBe("connected");
+    expect(sockets[1].closed).toBe(false);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(sockets).toHaveLength(2);
+    manager.disconnect();
+  });
+
+  it.each([undefined, { maxAttempts: 1 }])(
+    "keeps a replacement started by a stopped listener when reconnect is %j",
+    async (reconnect) => {
+      const { runtime, sockets } = socketRuntime();
+      let replacement: Promise<string> | undefined;
+      let replacementState = "pending";
+      const manager = new WebSocketManager(
+        { url: "wss://example.test", reconnect },
+        {
+          onStateChange: (state) => {
+            if (state === "stopped" && !replacement) {
+              replacement = manager.connect().then(
+                () => (replacementState = "connected"),
+                () => (replacementState = "rejected"),
+              );
+            }
+          },
+          onError: () => {
+            if (replacement) manager.disconnect();
+          },
+        },
+        runtime,
+      );
+      const connecting = manager.connect();
+      sockets[0].onopen?.();
+      await connecting;
+
+      sockets[0].onerror?.();
+      await Promise.resolve();
+
+      expect(sockets).toHaveLength(2);
+      expect(replacementState).toBe("pending");
+      expect(sockets[0].closed).toBe(true);
+      expect(sockets[1].closed).toBe(false);
+      expect(vi.getTimerCount()).toBe(0);
+      sockets[1].onopen?.();
+      await expect(replacement).resolves.toBe("connected");
+      expect(manager.state).toBe("connected");
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(sockets).toHaveLength(2);
+      manager.disconnect();
+    },
+  );
+
+  it("keeps a replacement started by an exhausted reconnect error listener", async () => {
+    const { runtime, sockets } = socketRuntime();
+    let replacement: Promise<string> | undefined;
+    let replacementState = "pending";
+    const manager = new WebSocketManager(
+      { url: "wss://example.test", reconnect: { maxAttempts: 1 } },
+      {
+        onError: () => {
+          if (manager.state !== "stopped") return;
+          manager.disconnect();
+          replacement = manager.connect().then(
+            () => (replacementState = "connected"),
+            () => (replacementState = "rejected"),
+          );
+        },
+      },
+      runtime,
+    );
+    const rejected = expect(manager.connect()).rejects.toBeInstanceOf(
+      ConnectionError,
+    );
+
+    sockets[0].onerror?.();
+    await rejected;
+
+    expect(sockets).toHaveLength(2);
+    expect(replacementState).toBe("pending");
+    expect(sockets[0].closed).toBe(true);
+    expect(sockets[1].closed).toBe(false);
+    expect(vi.getTimerCount()).toBe(0);
+    sockets[1].onopen?.();
+    await expect(replacement).resolves.toBe("connected");
+    expect(manager.state).toBe("connected");
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(sockets).toHaveLength(2);
+    manager.disconnect();
+  });
+});
 
 describe("NexusPulse WebSocket cancellation", () => {
   beforeEach(() => vi.useFakeTimers());

@@ -156,3 +156,7 @@ await pulse.clearBadge();
 ## 模块格式
 
 三个入口均提供 ESM、CommonJS、source map 和 TypeScript 类型声明，可由应用的构建工具按模块格式解析。
+
+## 许可
+
+[MIT](./LICENSE) © 2026 NexusMC-CN

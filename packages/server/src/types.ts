@@ -131,7 +131,10 @@ export interface FastifyInstanceLike {
   delete(path: string, handler: FastifyRouteHandler): unknown;
   get?(
     path: string,
-    options: { websocket: true },
+    options: {
+      websocket: true;
+      preHandler?: FastifyRouteHandler;
+    },
     handler: FastifyWebSocketHandler,
   ): unknown;
   decorate?(name: string, value: unknown): unknown;
@@ -145,6 +148,7 @@ export interface FastifyPluginOptions {
   ) => string | null | undefined | Promise<string | null | undefined>;
   websocket?: {
     path?: string;
+    /** Called synchronously after upgrade. Attach message listeners before any await. */
     onWebSocket: (
       socket: unknown,
       request: FastifyRequestLike,

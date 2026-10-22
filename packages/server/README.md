@@ -116,22 +116,46 @@ await fastify.register(nexusPulseFastify, {
 
 适配器不会实现 CSRF 防护、限流、请求体大小限制、认证或错误响应封装。注册此适配器前，请先注册宿主应用的 hook/plugin，并配置 Fastify 的 `bodyLimit`。宿主还应在 `resolveUserId` 中执行租户授权，并使用自己的日志和指标策略。
 
-WebSocket 升级是可选能力，由应用负责。当宿主集成需要 WebSocket 时，请提供 GET hook。适配器会使用 Fastify 的 WebSocket 选项注册路由，并把升级后的 socket 传给回调：
+WebSocket 升级是可选能力，由应用负责。需要 WebSocket 时，安装 `@fastify/websocket@11`，并在此适配器及 WebSocket 路由之前注册插件：
+
+```bash
+npm install @fastify/websocket@11
+```
+
+TypeScript 项目还需要安装 WebSocket 类型声明：
+
+```bash
+npm install -D @types/ws
+```
+
+适配器使用 Fastify 的 WebSocket 选项注册路由，并把升级后的 socket 传给回调：
 
 ```ts
+import websocket from "@fastify/websocket";
+
+await fastify.register(websocket);
 await fastify.register(nexusPulseFastify, {
   service,
   resolveUserId: (request) => (request.user as { id: string }).id,
   websocket: {
     onWebSocket(socket, request, userId) {
+      // accept 必须同步注册消息监听器。
       return websocketHost.accept(socket, request, { userId });
     },
   },
 });
 ```
 
+适配器在路由的 `preHandler` hook 中等待 `resolveUserId`。宿主的全局或插件 `preHandler` hook 会先执行，因此可以继续在其中填充 `request.user`；身份解析完成后才允许升级。缺少身份时返回 HTTP 401；解析器抛错或 Promise 拒绝会进入 Fastify 的 HTTP 错误处理流程，默认返回 500。身份每次请求只解析一次，并绑定到该请求，避免并发连接混用用户身份。
+
+连接升级后会同步调用 `onWebSocket`。宿主必须在该回调或其调用的方法中同步注册 `message` 等监听器，再执行异步操作；若先 `await` 再注册监听器，期间到达的消息仍可能丢失。异步消息处理和消息监听器内的异常处理由宿主负责。详见 [Fastify WebSocket 生命周期与监听器要求](https://github.com/fastify/fastify-websocket#attaching-event-handlers)。
+
 适配器不会注册广播路由。发送通知是服务端应用通过 `service.send` 执行的操作，应用可以在投递前应用授权和业务规则。
 
 ## 模块格式
 
 核心入口和 `@nexusmc-cn/nexuspulse-server/fastify` 均提供 ESM、CommonJS、source map 和 TypeScript 类型声明。
+
+## 许可
+
+[MIT](./LICENSE) © 2026 NexusMC-CN

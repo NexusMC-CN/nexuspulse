@@ -7,6 +7,7 @@ import ts from "typescript";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const requiredFiles = [
+  "LICENSE",
   "dist/index.js",
   "dist/index.cjs",
   "dist/index.d.ts",
@@ -23,7 +24,7 @@ const requiredFiles = [
 
 for (const relativePath of requiredFiles) {
   if (!existsSync(path.join(root, relativePath))) {
-    throw new Error(`Missing build output: ${relativePath}`);
+    throw new Error(`Missing package file: ${relativePath}`);
   }
 }
 
@@ -112,6 +113,7 @@ const unexpected = paths.filter(
   (filePath) =>
     filePath !== "package.json" &&
     filePath !== "README.md" &&
+    filePath !== "LICENSE" &&
     !filePath.startsWith("dist/"),
 );
 if (unexpected.length > 0) {

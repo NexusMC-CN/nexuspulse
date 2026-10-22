@@ -138,21 +138,23 @@ export class WebSocketManager {
     if (!config || this.stopped) {
       this.stopped = true;
       this.detachCurrent(false);
-      this.setState("stopped");
       this.settlePendingFailure(
         new ConnectionError("WebSocket connection stopped before opening"),
       );
+      this.setState("stopped");
       return;
     }
     if (this.reconnectAttempts >= config.maxAttempts) {
       this.stopped = true;
       this.detachCurrent(false);
-      this.setState("stopped");
+      const token = this.generation;
       const connectionError = new ConnectionError(
         "WebSocket reconnect attempts exhausted",
       );
-      this.reportError(connectionError);
       this.settlePendingFailure(connectionError);
+      this.setState("stopped");
+      if (this.generation !== token) return;
+      this.reportError(connectionError);
       return;
     }
     const delay = Math.min(
@@ -216,8 +218,10 @@ export class WebSocketManager {
       if (this.stopped || this.generation !== token || this.current !== socket)
         return;
       const connectionError = this.reportError(new ConnectionError());
+      if (this.stopped || this.generation !== token || this.current !== socket)
+        return;
       this.settlePendingFailure(connectionError);
-      this.detachCurrent(false);
+      this.detachCurrent(true);
       this.scheduleReconnect();
     };
     socket.onclose = () => {
@@ -225,11 +229,13 @@ export class WebSocketManager {
         return;
       const wasConnecting = this.currentState === "connecting";
       this.detachCurrent(false);
+      const closedGeneration = this.generation;
       if (wasConnecting) {
         const connectionError = new ConnectionError(
           "WebSocket closed before connection opened",
         );
         this.reportError(connectionError);
+        if (this.stopped || this.generation !== closedGeneration) return;
         this.settlePendingFailure(connectionError);
       }
       this.scheduleReconnect();

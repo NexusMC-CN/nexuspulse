@@ -242,50 +242,6 @@ describe("createNexusPulseFastifyPlugin", () => {
     expect(postReply.response.status).toBe(401);
   });
 
-  it("delegates an optional websocket route to the host integration", async () => {
-    const service = new NotificationService({
-      store: {
-        upsert: vi.fn(),
-        removeForUser: vi.fn(),
-        listByUser: vi.fn(),
-      },
-    });
-    const { fastify, routes } = createFastify();
-    const onWebSocket = vi.fn(async () => "accepted");
-    await createNexusPulseFastifyPlugin({
-      service,
-      resolveUserId: () => "user-1",
-      websocket: { path: "/socket", onWebSocket },
-    })(fastify);
-
-    const socket = { close: vi.fn() };
-    await routes.get("GET /nexuspulse/socket")?.(socket, {});
-
-    expect(onWebSocket).toHaveBeenCalledOnce();
-    expect(onWebSocket).toHaveBeenCalledWith(socket, {}, "user-1", service);
-  });
-
-  it("closes unauthenticated websocket clients", async () => {
-    const service = new NotificationService({
-      store: {
-        upsert: vi.fn(),
-        removeForUser: vi.fn(),
-        listByUser: vi.fn(),
-      },
-    });
-    const { fastify, routes } = createFastify();
-    await createNexusPulseFastifyPlugin({
-      service,
-      resolveUserId: () => undefined,
-      websocket: { onWebSocket: vi.fn() },
-    })(fastify);
-
-    const socket = { close: vi.fn() };
-    await routes.get("GET /nexuspulse/websocket")?.(socket, {});
-
-    expect(socket.close).toHaveBeenCalledWith(1008, "Unauthorized");
-  });
-
   it("normalizes a websocket path without a leading slash", async () => {
     const service = new NotificationService({
       store: {

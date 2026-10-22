@@ -84,31 +84,31 @@ export function createNexusPulseFastifyPlugin(options: FastifyPluginOptions) {
         return reply.code(204).send();
       },
     );
-    if (options.websocket) {
+    const websocket = options.websocket;
+    if (websocket) {
       if (!fastify.get) {
         throw new Error(
           "WebSocket support requires a Fastify WebSocket integration",
         );
       }
+      const authenticatedUsers = new WeakMap<FastifyRequestLike, string>();
       fastify.get(
-        routePath(prefix, options.websocket.path ?? "/websocket"),
-        { websocket: true },
-        async (socket, request) => {
-          const userId = await resolveUserId(request);
-          if (!userId) {
-            if (
-              socket &&
-              typeof socket === "object" &&
-              "close" in socket &&
-              typeof (socket as { close?: unknown }).close === "function"
-            ) {
-              (
-                socket as { close: (code: number, reason: string) => void }
-              ).close(1008, "Unauthorized");
-            }
-            return;
-          }
-          return options.websocket?.onWebSocket(
+        routePath(prefix, websocket.path ?? "/websocket"),
+        {
+          websocket: true,
+          async preHandler(request, reply) {
+            const userId = await resolveUserId(request);
+            if (!userId)
+              return reply
+                .code(401)
+                .send({ error: new MissingUserError().name });
+            authenticatedUsers.set(request, userId);
+          },
+        },
+        (socket, request) => {
+          const userId = authenticatedUsers.get(request);
+          if (!userId) throw new MissingUserError();
+          return websocket.onWebSocket(
             socket,
             request,
             userId,

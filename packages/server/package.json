@@ -1,7 +1,30 @@
 {
   "name": "@nexusmc-cn/nexuspulse-server",
-  "version": "0.1.1",
-  "description": "Framework-agnostic Node.js notification service and Fastify adapter for NexusPulse",
+  "version": "0.1.2",
+  "description": "TypeScript Node.js notification service for Web Push and WebSocket with an optional Fastify adapter",
+  "license": "MIT",
+  "keywords": [
+    "nexuspulse",
+    "notifications",
+    "push-notifications",
+    "web-push",
+    "webpush",
+    "websocket",
+    "fastify",
+    "fastify-plugin",
+    "notification-service",
+    "nodejs",
+    "typescript"
+  ],
+  "homepage": "https://github.com/NexusMC-CN/nexuspulse/tree/main/packages/server#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NexusMC-CN/nexuspulse.git",
+    "directory": "packages/server"
+  },
+  "bugs": {
+    "url": "https://github.com/NexusMC-CN/nexuspulse/issues"
+  },
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -30,7 +53,8 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "build": "tsup",
@@ -41,10 +65,12 @@
     "prepack": "npm run build"
   },
   "devDependencies": {
+    "@fastify/websocket": "^11.3.4",
+    "@nexusmc-cn/nexuspulse": "0.1.2",
     "@types/node": "^24.7.2",
+    "@types/ws": "^8.18.2",
     "fastify": "^5.12.5",
     "prettier": "^3.6.2",
-    "@nexusmc-cn/nexuspulse": "0.1.1",
     "tsup": "^8.5.0",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"
@@ -53,8 +79,8 @@
     "fastify-plugin": "^5.1.0"
   },
   "peerDependencies": {
-    "fastify": ">=5.0.0 <6.0.0",
-    "@nexusmc-cn/nexuspulse": "^0.1.1"
+    "@nexusmc-cn/nexuspulse": "^0.1.1",
+    "fastify": ">=5.0.0 <6.0.0"
   },
   "peerDependenciesMeta": {
     "fastify": {

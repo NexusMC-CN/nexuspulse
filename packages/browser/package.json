@@ -1,11 +1,37 @@
 {
   "name": "@nexusmc-cn/nexuspulse",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
   },
   "description": "TypeScript browser notification runtime for Push, Notifications, Service Workers, WebSocket and Badging",
+  "license": "MIT",
+  "keywords": [
+    "nexuspulse",
+    "notifications",
+    "web-notifications",
+    "push-notifications",
+    "web-push",
+    "webpush",
+    "push-api",
+    "service-worker",
+    "websocket",
+    "badging",
+    "vapid",
+    "pwa",
+    "browser",
+    "typescript"
+  ],
+  "homepage": "https://github.com/NexusMC-CN/nexuspulse/tree/main/packages/browser#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NexusMC-CN/nexuspulse.git",
+    "directory": "packages/browser"
+  },
+  "bugs": {
+    "url": "https://github.com/NexusMC-CN/nexuspulse/issues"
+  },
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -44,7 +70,8 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "build": "tsup",

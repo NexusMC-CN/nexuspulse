@@ -53,3 +53,7 @@ npm install fastify@5
 - 服务端核心不绑定 Web 框架。Fastify 适配器支持 Fastify 5，认证、持久化、Push 传输和 WebSocket 连接由应用提供。
 
 完整示例见 [浏览器接入文档](./packages/browser/README.md) 和 [服务端接入文档](./packages/server/README.md)。
+
+## 许可
+
+[MIT](./LICENSE) © 2026 NexusMC-CN
