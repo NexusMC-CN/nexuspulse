@@ -1,34 +1,42 @@
 # 更新记录
 
-## 未发布
+## 0.1.3 — 待发布
 
 ### `@nexusmc-cn/nexuspulse`
 
+- WebSocket 前台通知可携带详情页链接，点击后按同源或窗口端允许来源规则打开页面；顶层 `allowedOrigins` 保留为 `security.allowedOrigins` 的兼容别名。
+- 文件上传成功通知可携带 `data.fileId`，失败通知可携带 `data.uploadId` 和失败详情页链接。
 - 新增 `webSocket.autoNotify` 选项。设为 `false` 时仍触发 `message` 事件，但不自动显示系统通知；默认行为保持不变。
+- 按核心运行时、通知、Push、徽标和 WebSocket 分目录整理浏览器源码，保留现有包入口。
 - 启用 `noUncheckedIndexedAccess` 和 `exactOptionalPropertyTypes`，收紧事件监听器与可选属性的类型约束，并补充协议类型的 `import type` 用法。
 
 ### `@nexusmc-cn/nexuspulse-server`
 
+- Push 查询失败时仍继续尝试 WebSocket，并在结果中记录失败。
 - 按核心类型、通知服务和 Fastify 集成整理内部源码目录，保留现有包入口与公开导出。
 
 ### 工程
 
 - 新增 Ubuntu 和 Windows、Node.js 22 和 24 的 CI 检查，覆盖构建、类型检查、测试、格式检查及两个包的打包验证。
+- 用 `.gitattributes` 固定文本文件为 LF 换行，避免 Windows 检出后格式检查误报。
 - 将开发工具更新至 TypeScript 6、tsup 9、Vitest 5 和 Node.js 26 类型声明。
+- 更新 Fastify 开发依赖及其依赖锁定版本，处理依赖审计提示。
+
+### 验证
+
+- 干净安装、依赖审计、类型检查、格式检查和双包构建通过；全量 127 项测试通过。
+- 两个实际压缩包分别包含 23 和 19 个文件，在独立目录安装后，ESM/CommonJS 入口及 TypeScript 6、Node.js 24 类型声明下的 NodeNext 类型检查通过。
 
 ## 0.1.2 — 2026-10-17
 
 ### `@nexusmc-cn/nexuspulse`
 
-- WebSocket 前台通知和 Service Worker Push 通知可携带详情页链接，点击后按同源或允许来源规则打开页面。
-- 文件上传成功通知可携带 `data.fileId`，失败通知可携带 `data.uploadId` 和失败详情页链接。
-- 按核心运行时、通知、Push、徽标和 WebSocket 分目录整理浏览器源码，保留现有包入口。
+- Service Worker Push 通知可携带详情页链接，点击后按同源或允许来源规则打开页面。
 - 修复 WebSocket 发生 `error` 后旧连接未主动关闭的问题，移除事件处理器并关闭旧连接后再安排重连。
 - 连接错误、提前关闭或重连终止的回调中同步重新连接时，旧流程不再误结算新连接或额外安排重连。
 
 ### `@nexusmc-cn/nexuspulse-server`
 
-- 上传结果可通过现有通知协议发送；Push 查询失败时仍继续尝试 WebSocket，并在结果中记录失败。
 - 将 Fastify WebSocket 身份解析移到升级前，避免异步鉴权期间丢失客户端消息；未认证请求在 HTTP 阶段返回 401。
 - 升级后同步调用宿主的 `onWebSocket`，便于立即注册消息监听器。
 
@@ -37,13 +45,6 @@
 - 两个包均补充仓库地址、仓库内目录、使用文档主页和问题反馈地址。
 - 添加 MIT 许可证声明，并在仓库和两个 npm 安装包中包含完整许可文本。
 - 按浏览器通知、Web Push、Service Worker、WebSocket 和 Fastify 等实际功能补充搜索关键词，并完善服务端包描述。
-
-### 验证
-
-- 全量 125 项测试通过，包含文件上传通知、浏览器连接生命周期回归和真实 Fastify WebSocket 集成测试。
-- 类型、格式、ESM/CommonJS 构建和浏览器包冒烟检查通过。
-- 两个实际安装包在独立目录安装后，元数据、MIT 许可、全部模块入口、NodeNext 类型声明、HTTP 订阅和 WebSocket 首条消息验证通过。
-- 两个包的 npm 发布演练通过。
 
 ## 0.1.1 — 2026-10-17
 
